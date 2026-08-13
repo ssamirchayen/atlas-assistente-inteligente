@@ -8,6 +8,7 @@ from typing import Any
 from atlas.automation.browser import BrowserAutomation
 from atlas.automation.files import FileAutomation
 from atlas.automation.helpdesk import HelpDeskAutomation
+from atlas.automation.hr import HRAutomation
 from atlas.automation.keyboard import KeyboardAutomation
 from atlas.automation.mouse import MouseAutomation
 from atlas.automation.process import ProcessAutomation
@@ -28,6 +29,7 @@ class AutomationEngine:
         self.browser = BrowserAutomation(browser_session)
         self.files = FileAutomation()
         self.helpdesk = HelpDeskAutomation()
+        self.hr = HRAutomation()
         self.keyboard = KeyboardAutomation()
         self.mouse = MouseAutomation()
         self.process = ProcessAutomation()
@@ -50,6 +52,9 @@ class AutomationEngine:
 
             # Suporte de TI
             "helpdesk.diagnose": self._helpdesk_diagnose,
+
+            # Recursos Humanos
+            "hr.generate_document": self._hr_generate_document,
 
             # Comercial
             "sales.compose_message": self._sales_compose_message,
@@ -342,6 +347,16 @@ class AutomationEngine:
         parameters: dict[str, Any],
     ) -> str:
         return self.helpdesk.diagnose(parameters)
+
+    # ==========================
+    # Recursos Humanos
+    # ==========================
+
+    def _hr_generate_document(
+        self,
+        parameters: dict[str, Any],
+    ) -> str:
+        return self.hr.generate_document(parameters)
 
     # ==========================
     # Comercial

@@ -66,6 +66,7 @@ são:
 | Agente | Domínios principais | Prioridade |
 | --- | --- | ---: |
 | Browser Agent | navegador, web e pesquisa | 300 |
+| RH Agent | recrutamento, seleção e comunicação | 280 |
 | IT Help Desk Agent | suporte, diagnóstico e infraestrutura | 275 |
 | Sales Agent | vendas, atendimento comercial e leads | 250 |
 | Coding Agent | código, desenvolvimento e projeto | 200 |
