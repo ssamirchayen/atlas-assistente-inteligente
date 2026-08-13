@@ -10,6 +10,7 @@ from atlas.automation.files import FileAutomation
 from atlas.automation.keyboard import KeyboardAutomation
 from atlas.automation.mouse import MouseAutomation
 from atlas.automation.process import ProcessAutomation
+from atlas.automation.sales import SalesAutomation
 from atlas.automation.window import WindowAutomation
 from atlas.browser.session import BrowserSession
 from atlas.planner.actions import Action
@@ -28,6 +29,7 @@ class AutomationEngine:
         self.keyboard = KeyboardAutomation()
         self.mouse = MouseAutomation()
         self.process = ProcessAutomation()
+        self.sales = SalesAutomation()
         self.window = WindowAutomation()
 
         self._handlers: dict[
@@ -43,6 +45,9 @@ class AutomationEngine:
 
             # Processos
             "process.start": self._process_start,
+
+            # Comercial
+            "sales.compose_message": self._sales_compose_message,
 
             # Navegador
             "browser.open": self._browser_open,
@@ -322,6 +327,16 @@ class AutomationEngine:
             )
 
         return self.process.start(command)
+
+    # ==========================
+    # Comercial
+    # ==========================
+
+    def _sales_compose_message(
+        self,
+        parameters: dict[str, Any],
+    ) -> str:
+        return self.sales.compose_message(parameters)
 
     # ==========================
     # Navegador
