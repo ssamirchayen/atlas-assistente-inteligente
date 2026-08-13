@@ -7,6 +7,7 @@ from typing import Any
 
 from atlas.automation.browser import BrowserAutomation
 from atlas.automation.files import FileAutomation
+from atlas.automation.helpdesk import HelpDeskAutomation
 from atlas.automation.keyboard import KeyboardAutomation
 from atlas.automation.mouse import MouseAutomation
 from atlas.automation.process import ProcessAutomation
@@ -26,6 +27,7 @@ class AutomationEngine:
     ) -> None:
         self.browser = BrowserAutomation(browser_session)
         self.files = FileAutomation()
+        self.helpdesk = HelpDeskAutomation()
         self.keyboard = KeyboardAutomation()
         self.mouse = MouseAutomation()
         self.process = ProcessAutomation()
@@ -45,6 +47,9 @@ class AutomationEngine:
 
             # Processos
             "process.start": self._process_start,
+
+            # Suporte de TI
+            "helpdesk.diagnose": self._helpdesk_diagnose,
 
             # Comercial
             "sales.compose_message": self._sales_compose_message,
@@ -327,6 +332,16 @@ class AutomationEngine:
             )
 
         return self.process.start(command)
+
+    # ==========================
+    # Suporte de TI
+    # ==========================
+
+    def _helpdesk_diagnose(
+        self,
+        parameters: dict[str, Any],
+    ) -> str:
+        return self.helpdesk.diagnose(parameters)
 
     # ==========================
     # Comercial

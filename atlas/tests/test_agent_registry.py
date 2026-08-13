@@ -8,6 +8,7 @@ from atlas.agents.base import AgentMetadata
 from atlas.agents.browser import BrowserAgent
 from atlas.agents.coding import CodingAgent
 from atlas.agents.desktop import DesktopAgent
+from atlas.agents.helpdesk import HelpDeskAgent
 from atlas.agents.registry import AgentRegistry
 from atlas.agents.sales import SalesAgent
 from atlas.planner.actions import Action
@@ -151,6 +152,7 @@ def test_catalog_contains_existing_agents_in_priority_order() -> None:
         (
             DesktopAgent(),
             CodingAgent(),
+            HelpDeskAgent(),
             SalesAgent(),
             BrowserAgent(),
         )
@@ -158,6 +160,7 @@ def test_catalog_contains_existing_agents_in_priority_order() -> None:
 
     assert [metadata.name for metadata in registry.catalog()] == [
         "browser",
+        "helpdesk",
         "sales",
         "coding",
         "desktop",

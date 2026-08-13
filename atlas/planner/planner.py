@@ -6,6 +6,7 @@ import unicodedata
 from atlas.agents.browser import BrowserAgent
 from atlas.agents.coding import CodingAgent
 from atlas.agents.desktop import DesktopAgent
+from atlas.agents.helpdesk import HelpDeskAgent
 from atlas.agents.registry import AgentRegistry
 from atlas.agents.sales import SalesAgent
 from atlas.context.manager import ContextManager
@@ -21,11 +22,13 @@ class Planner:
         self.session = context.session
         self.desktop_agent = DesktopAgent()
         self.coding_agent = CodingAgent()
+        self.helpdesk_agent = HelpDeskAgent()
         self.sales_agent = SalesAgent()
         self.browser_agent = BrowserAgent()
         self.agent_registry = AgentRegistry(
             (
                 self.browser_agent,
+                self.helpdesk_agent,
                 self.sales_agent,
                 self.coding_agent,
                 self.desktop_agent,
@@ -122,7 +125,26 @@ class Planner:
 
             return direct_actions
 
-        # 3. Agente especializado em vendas.
+        # 3. Agente especializado em suporte de TI.
+        helpdesk_selection = self.agent_registry.route(
+            original_command,
+            candidates=("helpdesk",),
+        )
+
+        if helpdesk_selection is not None:
+            if show_logs:
+                print(
+                    "[PLANNER] "
+                    f"{helpdesk_selection.metadata.display_name} "
+                    "reconheceu o incidente."
+                )
+
+                for action in helpdesk_selection.actions:
+                    print(f"[PLANO] {action}")
+
+            return list(helpdesk_selection.actions)
+
+        # 4. Agente especializado em vendas.
         sales_selection = self.agent_registry.route(
             original_command,
             candidates=("sales",),
@@ -141,7 +163,7 @@ class Planner:
 
             return list(sales_selection.actions)
 
-        # 4. Agente especializado em navegação.
+        # 5. Agente especializado em navegação.
         browser_selection = self.agent_registry.route(
             original_command,
             candidates=("browser",),
@@ -160,7 +182,7 @@ class Planner:
 
             return list(browser_selection.actions)
 
-        # 5. Análise tradicional de intenção.
+        # 6. Análise tradicional de intenção.
         intent = self.intent_analyzer.analyze(original_command)
 
         if show_logs:
@@ -193,7 +215,7 @@ class Planner:
             if desktop_selection is not None:
                 return list(desktop_selection.actions)
 
-        # 6. Fallback dos agentes tradicionais.
+        # 7. Fallback dos agentes tradicionais.
         agent_selection = self.agent_registry.route(
             original_command,
             candidates=("coding", "desktop"),
@@ -209,7 +231,7 @@ class Planner:
 
             return list(agent_selection.actions)
 
-        # 7. Planner Inteligente.
+        # 8. Planner Inteligente.
         intelligent_actions = self.intelligent.plan(
             original_command
         )
