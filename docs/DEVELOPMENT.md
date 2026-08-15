@@ -43,14 +43,6 @@ Para verificar sintaxe de todo o backend:
 4. Adicione testes sem abrir aplicações reais.
 5. Execute Pytest e Ruff.
 
-## Como adicionar um agente especializado
-
-1. Implemente `plan(command)` retornando uma lista de `Action`.
-2. Declare `AgentMetadata` com nome único, descrição, domínios e prioridade.
-3. Registre a instância no `AgentRegistry` criado pelo Planner.
-4. Mantenha automação concreta fora do agente, em `atlas/automation/`.
-5. Teste seleção, prioridade, comandos incompatíveis e falhas internas.
-
 ## Como adicionar um fluxo
 
 Use `WorkflowBuilder`, `WorkflowStep` e `WorkflowState`. Compartilhe dados pelo

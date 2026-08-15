@@ -132,6 +132,31 @@ MEMORY_CONSOLIDATION_THRESHOLD = _env_float(
     maximum=1.0,
 )
 
+API_HOST = "127.0.0.1"
+API_PORT = min(
+    _env_int("ATLAS_API_PORT", 8765, minimum=1),
+    65535,
+)
+API_ADMIN_KEY = os.getenv("ATLAS_API_KEY", "").strip()
+API_READ_KEY = os.getenv("ATLAS_API_READ_KEY", "").strip()
+API_COMMAND_TIMEOUT = _env_float(
+    "ATLAS_API_COMMAND_TIMEOUT",
+    120.0,
+    minimum=1.0,
+    maximum=3600.0,
+)
+API_AUDIT_DB = DATA_DIR / "api_audit.db"
+API_AUDIT_RETENTION_DAYS = _env_int(
+    "ATLAS_API_AUDIT_RETENTION_DAYS",
+    90,
+    minimum=1,
+)
+API_AUDIT_MAX_EVENTS = _env_int(
+    "ATLAS_API_AUDIT_MAX_EVENTS",
+    10000,
+    minimum=100,
+)
+
 MIC_ENABLED = os.getenv("ATLAS_MIC", "1") == "1"
 VOICE_ENABLED = os.getenv("ATLAS_VOICE", "1") == "1"
 WAKE_WORD_ENABLED = os.getenv("ATLAS_WAKE_WORD", "1") == "1"

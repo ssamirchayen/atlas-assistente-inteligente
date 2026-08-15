@@ -17,41 +17,18 @@ htmlcov/
 !.env.example
 
 # Dados locais do Atlas
-data/
-atlas_data/
-*.db
-*.db-wal
-*.db-shm
-*.sqlite
-*.sqlite3
+data/*.db
+data/*.db-*
+data/*.json
+atlas_data/*.json
 
 # Logs
 logs/*.log
-logs/
 *.log
 ruff_erros.txt
-
-# Builds, pacotes e relatórios
-build/
-dist/
-*.egg-info/
-*.zip
-*.tar.gz
-playwright-report/
-test-results/
-
-# Arquivos temporários e backups
-*.tmp
-*.bak
-*.backup
-*~
-
-# Relatórios internos de implementação por sprint
-SPRINT*.md
 
 # IDE e sistema operacional
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-Desktop.ini

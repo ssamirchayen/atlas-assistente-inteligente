@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
 from atlas.core.config import ATLAS_NAME
-from atlas.core.controller import AtlasController
+from atlas.core.controller import AtlasController, WorkflowProgressSnapshot
 from atlas.scheduler.worker import SchedulerWorker
 
 _LOGGER = logging.getLogger(__name__)
@@ -192,11 +192,21 @@ class AtlasGuiService:
             source="brain",
         )
 
-    def cancel(self) -> bool:
+    def cancel(
+        self,
+        *,
+        reason: str = "Cancelado pela interface",
+        requested_by: str = "Ssamir",
+    ) -> bool:
         return self.controller.cancel_active_workflow(
-            reason="Cancelado pela interface",
-            requested_by="Ssamir",
+            reason=reason,
+            requested_by=requested_by,
         )
+
+    def workflow_snapshot(self) -> WorkflowProgressSnapshot | None:
+        """Expõe somente os dados necessários à observabilidade da API."""
+
+        return self.controller.workflow_snapshot()
 
     def close(self) -> None:
         if self.scheduler_worker is not None and self._started:

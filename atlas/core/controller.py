@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from threading import Lock
 from typing import TYPE_CHECKING
 
@@ -10,6 +11,17 @@ from atlas.workflow.state import WorkflowState
 
 if TYPE_CHECKING:
     from atlas.core.kernel import AtlasKernel
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowProgressSnapshot:
+    """Visão consistente e somente leitura do workflow ativo."""
+
+    progress: float
+    completed_steps: int
+    total_steps: int
+    current_step: str | None
+    cancelled: bool
 
 
 class AtlasController:
@@ -51,6 +63,29 @@ class AtlasController:
             reason=reason,
             requested_by=requested_by,
         )
+
+    def workflow_snapshot(self) -> WorkflowProgressSnapshot | None:
+        """Retorna o progresso atual sem expor o estado mutável."""
+
+        with self._workflow_lock:
+            state = self._active_workflow
+
+            if state is None:
+                return None
+
+            current_action = state.current_action
+
+            return WorkflowProgressSnapshot(
+                progress=state.progress,
+                completed_steps=len(state.completed_steps),
+                total_steps=len(state.steps),
+                current_step=(
+                    current_action.type
+                    if current_action is not None
+                    else None
+                ),
+                cancelled=state.cancelled,
+            )
 
     def execute(
         self,

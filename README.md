@@ -2,7 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/Plataforma-Windows-0078D4?logo=windows)
-![Tests](https://img.shields.io/badge/Testes-300%2B-16A34A)
+![Tests](https://img.shields.io/badge/Testes-460%2B-16A34A)
 ![Code style](https://img.shields.io/badge/Qualidade-Ruff-D7FF64?logo=ruff&logoColor=black)
 ![License](https://img.shields.io/badge/Licen%C3%A7a-Propriet%C3%A1ria-111827)
 
@@ -31,7 +31,9 @@ com foco em privacidade, confiabilidade e evolução para cenários empresariais
 - recuperação híbrida por texto e similaridade semântica;
 - captura automática, correção, exclusão reversível e restauração de memórias;
 - registro central para agentes especializados;
-- mais de 300 testes automatizados e validação estática com Ruff.
+- API HTTP local versionada com observabilidade, autenticação, comandos,
+  workflows, cancelamento e auditoria persistente;
+- mais de 460 testes automatizados e validação estática com Ruff.
 
 ## Arquitetura
 
@@ -62,6 +64,7 @@ Detalhes: [Arquitetura técnica](docs/ARCHITECTURE.md).
 | Navegador | Playwright |
 | Voz | SpeechRecognition, Edge TTS e pyttsx3 |
 | Persistência | SQLite e JSON |
+| API local | FastAPI e Uvicorn |
 | Qualidade | Pytest e Ruff |
 
 ## Funcionalidades
@@ -117,8 +120,8 @@ Atlas, pare a automação
 Clone o repositório e entre na pasta:
 
 ```powershell
-git clone https://github.com/SEU-USUARIO/atlas-assistente.git
-cd atlas-assistente
+git clone https://github.com/ssamirchayen/atlas-assistente-inteligente.git
+cd atlas-assistente-inteligente
 ```
 
 Execute o instalador:
@@ -173,6 +176,53 @@ Modo principal pelo terminal:
 
 Também estão disponíveis `executar_gui.bat` e `executar.bat`.
 
+API local:
+
+```powershell
+.\.venv\Scripts\python.exe api_main.py
+```
+
+Antes da primeira execução, gere uma chave administrativa:
+
+```powershell
+.\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Copie o resultado para o `.env`:
+
+```text
+ATLAS_API_KEY=sua_chave_gerada
+```
+
+Com a API ativa, abra `http://127.0.0.1:8765/docs`. Use o botão **Authorize**
+para informar a chave. `health` e `version` são públicos; os demais endpoints
+exigem o cabeçalho `X-API-Key` e o escopo correspondente.
+
+Para executar um comando, abra `POST /api/v1/commands`, selecione **Try it
+out** e envie, por exemplo:
+
+```json
+{
+  "command": "Atlas, liste minhas memórias"
+}
+```
+
+O núcleo operacional é criado somente no primeiro comando e permanece em uma
+única thread. Isso preserva a afinidade da sessão do navegador entre chamadas.
+Execute somente uma instância operacional por vez: durante este teste, deixe a
+interface gráfica fechada.
+
+O `request_id` retornado também é o identificador do workflow. Ele pode ser
+consultado em `GET /api/v1/workflows/{workflow_id}` e uma execução ativa pode
+receber cancelamento cooperativo em
+`POST /api/v1/workflows/{workflow_id}/cancel`.
+
+A chave administrativa também pode consultar
+`GET /api/v1/audit/events`. A trilha fica em `data/api_audit.db` e registra
+somente metadados sanitizados. Chaves, comandos, respostas e motivos completos
+não são armazenados em texto aberto. Veja a
+[documentação de segurança e auditoria](docs/SPRINT20_API_SECURITY_AUDIT.md).
+
 ## Testes e qualidade
 
 ```powershell
@@ -191,6 +241,9 @@ O Atlas segue uma abordagem **local-first**:
 - `.env`, bancos, logs e dados operacionais não entram no repositório;
 - exclusões de memória são reversíveis;
 - ações destrutivas passam por validações específicas;
+- endpoints operacionais exigem chave e permissões por escopo;
+- a API aceita somente hosts locais e adiciona cabeçalhos de segurança;
+- a auditoria usa retenção limitada e redação de conteúdo sensível;
 - o projeto não exige envio da memória pessoal para um serviço em nuvem.
 
 Consulte [SECURITY.md](SECURITY.md) antes de publicar alterações.
@@ -201,9 +254,12 @@ Consulte [SECURITY.md](SECURITY.md) antes de publicar alterações.
 - [x] workflows, tarefas, agendamento e cancelamento;
 - [x] interface corporativa e voz contínua;
 - [x] memória semântica com ciclo de vida completo;
-- [ ] agentes especializados para domínios empresariais;
-- [ ] API e autenticação;
-- [ ] painel de administração e auditoria corporativa;
+- [x] agentes empresariais para vendas, suporte de TI e RH;
+- [x] base da API local, observabilidade, autenticação e permissões;
+- [x] execução autenticada de comandos pela API;
+- [x] consulta e cancelamento de workflows pela API;
+- [x] auditoria persistente e segurança final da API local;
+- [ ] painel de administração corporativo;
 - [ ] integrações com CRM, e-mail e calendário.
 
 ## Autor
