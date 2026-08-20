@@ -15,7 +15,13 @@ from atlas.core.config import (
     TTS_RATE,
     TTS_VOICE,
     TTS_VOLUME,
+    VOICE_PROFILE,
     VOICE_ENABLED,
+)
+from atlas.voice.latency import VoiceLatencyTracker
+from atlas.voice.profile import (
+    VoicePerformanceProfile,
+    resolve_voice_profile,
 )
 from atlas.voice.session import (
     VoiceSession,
@@ -32,9 +38,14 @@ class SpeechInterface:
         session: VoiceSession | None = None,
         *,
         tts_provider: str | None = None,
+        performance_profile: str | VoicePerformanceProfile | None = None,
     ) -> None:
         self.microphone_enabled = microphone_enabled
         self.session = session or VoiceSession()
+        self.performance_profile = resolve_voice_profile(
+            performance_profile or VOICE_PROFILE
+        )
+        self.latency = VoiceLatencyTracker(self.session)
         self.recognizer = sr.Recognizer()
         self.interruption_recognizer = sr.Recognizer()
 
@@ -45,9 +56,15 @@ class SpeechInterface:
         self.recognizer.dynamic_energy_ratio = 1.3
 
         # Espera mais tempo antes de considerar que você terminou
-        self.recognizer.pause_threshold = 1.7
-        self.recognizer.non_speaking_duration = 1.0
-        self.recognizer.phrase_threshold = 0.2
+        self.recognizer.pause_threshold = (
+            self.performance_profile.pause_threshold
+        )
+        self.recognizer.non_speaking_duration = (
+            self.performance_profile.non_speaking_duration
+        )
+        self.recognizer.phrase_threshold = (
+            self.performance_profile.phrase_threshold
+        )
 
         # Mantém uma pausa natural entre "Atlas" e "pare" sem deixar
         # a captura de interrupção presa por tempo demais.
@@ -72,6 +89,14 @@ class SpeechInterface:
             pitch=TTS_PITCH or "+0Hz",
         )
         self.windows_voice = WindowsSapiProvider()
+
+    def performance_snapshot(self) -> dict[str, object]:
+        """Retorna configuração e métricas sem conteúdo de fala."""
+
+        return {
+            "profile": self.performance_profile.name,
+            **self.latency.summary(),
+        }
 
     def say(self, message: str) -> None:
         message = str(message).strip()
@@ -329,7 +354,7 @@ class SpeechInterface:
 
         self.recognizer.adjust_for_ambient_noise(
             source,
-            duration=1.0,
+            duration=self.performance_profile.calibration_duration,
         )
 
         self._microphone_calibrated = True

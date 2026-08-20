@@ -157,6 +157,77 @@ API_AUDIT_MAX_EVENTS = _env_int(
     minimum=100,
 )
 
+INTERNET_SEARCH_ENABLED = _env_bool("ATLAS_INTERNET_SEARCH", True)
+INTERNET_SEARCH_TIMEOUT = _env_float(
+    "ATLAS_INTERNET_SEARCH_TIMEOUT",
+    8.0,
+    minimum=1.0,
+    maximum=30.0,
+)
+INTERNET_SEARCH_MAX_PER_DOMAIN = _env_int(
+    "ATLAS_INTERNET_SEARCH_MAX_PER_DOMAIN",
+    2,
+    minimum=1,
+)
+INTERNET_SEARCH_RATE_LIMIT = _env_int(
+    "ATLAS_INTERNET_SEARCH_RATE_LIMIT",
+    30,
+    minimum=1,
+)
+BRAVE_SEARCH_API_KEY = os.getenv("ATLAS_BRAVE_SEARCH_API_KEY", "").strip()
+SEARXNG_URL = os.getenv("ATLAS_SEARXNG_URL", "").strip()
+SEARXNG_ALLOW_PRIVATE = _env_bool(
+    "ATLAS_SEARXNG_ALLOW_PRIVATE",
+    False,
+)
+
+# Piloto escolar e WhatsApp Business Platform (Sprint 22, Etapa 3).
+# O modo simulado permanece ativo até a configuração explícita da escola.
+WHATSAPP_DRY_RUN = _env_bool("ATLAS_WHATSAPP_DRY_RUN", True)
+WHATSAPP_ACCESS_TOKEN = os.getenv(
+    "ATLAS_WHATSAPP_ACCESS_TOKEN",
+    "",
+).strip()
+WHATSAPP_GRAPH_API_VERSION = os.getenv(
+    "ATLAS_WHATSAPP_GRAPH_API_VERSION",
+    "v26.0",
+).strip()
+WHATSAPP_TIMEOUT = _env_float(
+    "ATLAS_WHATSAPP_TIMEOUT",
+    15.0,
+    minimum=1.0,
+    maximum=60.0,
+)
+WHATSAPP_MAX_BATCH_SIZE = min(
+    _env_int("ATLAS_WHATSAPP_MAX_BATCH_SIZE", 20, minimum=1),
+    20,
+)
+WHATSAPP_OPERATIONS_PER_MINUTE = _env_int(
+    "ATLAS_WHATSAPP_OPERATIONS_PER_MINUTE",
+    20,
+    minimum=1,
+)
+
+# Provisionamento corporativo de computadores (Sprint 22, Etapa 4).
+# A execução real é uma opção explícita; o padrão apenas simula o plano.
+PROVISIONING_DRY_RUN = _env_bool("ATLAS_PROVISIONING_DRY_RUN", True)
+PROVISIONING_WORKSPACE = Path(
+    os.getenv(
+        "ATLAS_PROVISIONING_WORKSPACE",
+        str(Path.home() / "Atlas_Workspace"),
+    )
+).expanduser().resolve()
+PROVISIONING_COMMAND_TIMEOUT = _env_float(
+    "ATLAS_PROVISIONING_COMMAND_TIMEOUT",
+    900.0,
+    minimum=10.0,
+    maximum=3600.0,
+)
+PROVISIONING_MAX_STEPS = min(
+    _env_int("ATLAS_PROVISIONING_MAX_STEPS", 25, minimum=1),
+    50,
+)
+
 SESSION_DB = DATA_DIR / "operational_sessions.db"
 SESSION_FILE = DATA_DIR / "last_session.json"
 
@@ -164,6 +235,7 @@ MIC_ENABLED = os.getenv("ATLAS_MIC", "1") == "1"
 VOICE_ENABLED = os.getenv("ATLAS_VOICE", "1") == "1"
 WAKE_WORD_ENABLED = os.getenv("ATLAS_WAKE_WORD", "1") == "1"
 TTS_PROVIDER = os.getenv("ATLAS_TTS_PROVIDER", "edge").strip().lower()
+VOICE_PROFILE = os.getenv("ATLAS_VOICE_PROFILE", "balanced").strip().lower()
 TTS_VOICE = os.getenv("ATLAS_TTS_VOICE", "pt-BR-AntonioNeural").strip()
 TTS_RATE = os.getenv("ATLAS_TTS_RATE", "+0%").strip()
 TTS_VOLUME = os.getenv("ATLAS_TTS_VOLUME", "+0%").strip()

@@ -20,6 +20,8 @@ flowchart TD
     B --> W[WorkflowEngine]
     W --> T[TaskManager]
     W --> E[Executor]
+    E --> CG[ConnectorGuard]
+    CG --> CR[Conectores externos]
     E --> X[AutomationEngine]
     X --> N[Navegador e Windows]
 ```
@@ -36,6 +38,10 @@ flowchart TD
 | `atlas/api/` | Expõe contratos HTTP locais e versionados |
 | `atlas/planner/` | Converte linguagem natural em ações estruturadas |
 | `atlas/agents/` | Registra e seleciona agentes por domínio e prioridade |
+| `atlas/connectors/` | Autoriza, limita e audita integrações externas |
+| `atlas/internet/` | Pesquisa múltiplas fontes, ranqueia e cita resultados |
+| `atlas/school/` | Piloto de CRM escolar, filas e WhatsApp Business |
+| `atlas/provisioning/` | Planeja e aplica perfis Windows com aprovação |
 | `atlas/workflow/` | Executa etapas, condições, retries e cancelamento |
 | `atlas/planner/task_manager.py` | Controla o ciclo de vida das tarefas |
 | `atlas/planner/executor.py` | Executa ações e padroniza resultados |
@@ -44,6 +50,7 @@ flowchart TD
 | `atlas/context/` | Mantém contexto recente da conversa |
 | `atlas/memory/` | Persiste memória local em SQLite |
 | `atlas/reasoning/` | Decide entre executar, perguntar e conversar |
+| `atlas/voice/` | Controla captura, estados, síntese, interrupção e latência |
 
 ## Fluxo de execução imediata
 
@@ -69,11 +76,78 @@ são:
 | Agente | Domínios principais | Prioridade |
 | --- | --- | ---: |
 | Browser Agent | navegador, web e pesquisa | 300 |
+| Radiology Support Agent | qualidade e fluxo radiológico | 295 |
+| Manaus Industrial Operations Agent | indústria, manutenção e qualidade | 292 |
+| Wholesale Operations Agent | atacado, estoque, margem e logística | 288 |
+| Programming Advisor Agent | criação, revisão e depuração de código | 282 |
 | RH Agent | recrutamento, seleção e comunicação | 280 |
 | IT Help Desk Agent | suporte, diagnóstico e infraestrutura | 275 |
 | Sales Agent | vendas, atendimento comercial e leads | 250 |
 | Coding Agent | código, desenvolvimento e projeto | 200 |
 | Desktop Agent | desktop, Windows e aplicações | 100 |
+
+Os quatro agentes de domínio da Sprint 22 são consultivos. Programação não
+executa o código produzido; radiologia não recebe pixels nem emite diagnóstico
+ou laudo; atacado não altera preços, pedidos ou saldos; indústria não controla
+máquinas ou PLC. As respostas passam por `DomainAutomation` e retornam texto
+para validação humana.
+
+## Conectores empresariais
+
+Antes de um agente ou workflow acessar um serviço externo, a operação deve ser
+representada por um `ConnectorOperation` e avaliada pelo `ConnectorGuard`. O
+risco e o escopo são obtidos do manifest registrado, impedindo que o comando
+rebaixe sua própria classificação.
+
+A camada aplica autorização, confirmação temporária, limite de lote, janela
+móvel por minuto, idempotência e auditoria sem conteúdo privado. Operações
+destrutivas permanecem bloqueadas por padrão. A Etapa 1 da Sprint 22 fornece
+essa base sem realizar chamadas de rede; executores reais serão integrados de
+forma incremental.
+
+### Pesquisa web
+
+O comando `internet.search` usa o `WebSearchService`. A Wikipédia em português
+é a fonte padrão; Brave Search e SearXNG são opcionais. Cada adaptador retorna
+um contrato comum, e falhas são isoladas por provedor.
+
+Antes da consolidação, URLs não públicas são descartadas e parâmetros de
+rastreamento são removidos. O ranking aplica relevância, posição, confiança,
+corroboração e diversidade de domínio. A resposta final preserva citações e
+uma trilha por fonte, mas nunca transforma texto recuperado em ação.
+
+### Piloto escolar e WhatsApp Business
+
+O pacote `atlas/school/` separa o contrato do CRM, a distribuição de leads e
+o transporte oficial da Meta. O sistema específico da escola implementa
+`SchoolCRM`; o Atlas não depende dos nomes de campos ou da API de um fornecedor.
+
+Cada vendedor possui um `phone_number_id` corporativo verificado. O contato
+só é preparado quando o lead possui prova de opt-in e o template está na lista
+aprovada. A atribuição e o envio são operações de escrita externa avaliadas
+pelo `ConnectorGuard`, exigindo confirmação temporária e idempotência. O modo
+simulado é o padrão e os registros de entrega guardam apenas o hash do destino.
+
+### Provisionamento de computadores
+
+O pacote `atlas/provisioning/` separa inventário, planejamento, autorização e
+execução. Perfis revisados declaram IDs exatos do WinGet e pastas relativas a
+um workspace; não há suporte a scripts ou comandos livres. O inventário não
+guarda hostname, usuário, serial ou catálogo global de programas.
+
+Aplicar um plano é uma escrita externa protegida pelo `ConnectorGuard`. A
+confirmação fica vinculada ao digest do plano e o inventário é revalidado antes
+da execução. O executor opera em dry-run por padrão, usa `shell=False`, escopo
+do usuário e remove somente pastas vazias criadas por ele quando uma etapa
+posterior falha.
+
+## Voz 2.0
+
+`VoiceSession` continua sendo a fonte única de verdade para escuta,
+processamento, fala e interrupção. `VoicePerformanceProfile` agrupa os tempos
+de captura em perfis declarativos, enquanto `VoiceLatencyTracker` observa as
+transições e mantém somente métricas agregadas em memória. Nenhuma transcrição
+ou amostra de áudio é armazenada na telemetria.
 
 ## Fluxo de agendamento
 

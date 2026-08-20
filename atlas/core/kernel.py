@@ -73,6 +73,7 @@ class AtlasKernel:
         # Execução
         self.automation = AutomationEngine(
             browser_session=self.context.browser,
+            domain_responder=self.brain.respond,
         )
 
         self.executor = Executor(

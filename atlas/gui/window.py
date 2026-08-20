@@ -74,6 +74,13 @@ class AtlasWindow(QMainWindow):
             self.speech,
             self._continuous_voice_command,
             wake_word=ATLAS_NAME,
+            listen_timeout=(
+                self.speech.performance_profile.continuous_listen_timeout
+            ),
+            phrase_time_limit=(
+                self.speech.performance_profile.continuous_phrase_time_limit
+            ),
+            idle_wait=self.speech.performance_profile.continuous_idle_wait,
         )
         self.interruption_monitor = VoiceInterruptionMonitor(
             self.speech,
@@ -723,7 +730,12 @@ class AtlasWindow(QMainWindow):
 
     def _microphone_worker(self) -> None:
         try:
-            command = self.speech.listen("Ouvindo seu comando...")
+            profile = self.speech.performance_profile
+            command = self.speech.listen(
+                "Ouvindo seu comando...",
+                timeout=profile.command_timeout,
+                phrase_time_limit=profile.command_phrase_time_limit,
+            )
 
             if command:
                 self.signals.voice_ready.emit(command)

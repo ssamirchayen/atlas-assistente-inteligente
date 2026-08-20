@@ -2,7 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/Plataforma-Windows-0078D4?logo=windows)
-![Tests](https://img.shields.io/badge/Testes-460%2B-16A34A)
+![Tests](https://img.shields.io/badge/Testes-620-16A34A)
 ![Code style](https://img.shields.io/badge/Qualidade-Ruff-D7FF64?logo=ruff&logoColor=black)
 ![License](https://img.shields.io/badge/Licen%C3%A7a-Propriet%C3%A1ria-111827)
 
@@ -33,7 +33,12 @@ com foco em privacidade, confiabilidade e evolução para cenários empresariais
 - registro central para agentes especializados;
 - API HTTP local versionada com observabilidade, autenticação, comandos,
   workflows, cancelamento e auditoria persistente;
-- mais de 460 testes automatizados e validação estática com Ruff.
+- memória operacional com sessões, linha do tempo e retomada segura;
+- pesquisa web com múltiplas fontes, ranking e citações;
+- piloto escolar com opt-in, filas e WhatsApp Business oficial em dry-run;
+- provisionamento Windows com inventário mínimo, aprovação e dry-run;
+- agentes consultivos para programação, radiologia, atacado e indústria;
+- 620 testes automatizados e validação estática com Ruff.
 
 ## Arquitetura
 
@@ -223,6 +228,13 @@ somente metadados sanitizados. Chaves, comandos, respostas e motivos completos
 não são armazenados em texto aberto. Veja a
 [documentação de segurança e auditoria](docs/SPRINT20_API_SECURITY_AUDIT.md).
 
+As sessões operacionais podem ser consultadas em `GET /api/v1/sessions` e
+`GET /api/v1/sessions/{session_id}/timeline`. O plano de um workflow
+interrompido fica disponível em `GET /api/v1/resumption`; sua execução exige
+uma solicitação explícita em `POST /api/v1/resumption` e confirmação quando o
+plano puder alterar estado externo. Consulte a
+[documentação da Sprint 21](docs/SPRINT21_MEMORIA_OPERACIONAL.md).
+
 ## Testes e qualidade
 
 ```powershell
@@ -259,8 +271,13 @@ Consulte [SECURITY.md](SECURITY.md) antes de publicar alterações.
 - [x] execução autenticada de comandos pela API;
 - [x] consulta e cancelamento de workflows pela API;
 - [x] auditoria persistente e segurança final da API local;
+- [x] memória operacional, linha do tempo e retomada segura;
+- [x] base segura de conectores e pesquisa web multifonte;
+- [x] piloto escolar para CRM e WhatsApp Business oficial;
+- [x] provisionamento Windows seguro e reversível;
+- [x] agentes consultivos de programação, radiologia, atacado e indústria;
 - [ ] painel de administração corporativo;
-- [ ] integrações com CRM, e-mail e calendário.
+- [ ] adaptadores reais para CRM, e-mail e calendário.
 
 ## Autor
 

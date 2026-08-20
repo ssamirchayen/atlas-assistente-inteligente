@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from atlas.automation.browser import BrowserAutomation
+from atlas.automation.domains import DomainAutomation
 from atlas.automation.files import FileAutomation
 from atlas.automation.helpdesk import HelpDeskAutomation
 from atlas.automation.hr import HRAutomation
@@ -15,6 +16,14 @@ from atlas.automation.process import ProcessAutomation
 from atlas.automation.sales import SalesAutomation
 from atlas.automation.window import WindowAutomation
 from atlas.browser.session import BrowserSession
+from atlas.connectors import ConnectorPrincipal
+from atlas.internet import (
+    SearchFreshness,
+    WebSearchRequest,
+    WebSearchService,
+    build_default_web_search_service,
+    build_local_search_principal,
+)
 from atlas.planner.actions import Action
 from atlas.planner.results import ExecutionResult
 
@@ -25,8 +34,12 @@ class AutomationEngine:
     def __init__(
         self,
         browser_session: BrowserSession | None = None,
+        internet_search: WebSearchService | None = None,
+        internet_principal: ConnectorPrincipal | None = None,
+        domain_responder: Callable[[str], str] | None = None,
     ) -> None:
         self.browser = BrowserAutomation(browser_session)
+        self.domains = DomainAutomation(domain_responder)
         self.files = FileAutomation()
         self.helpdesk = HelpDeskAutomation()
         self.hr = HRAutomation()
@@ -35,6 +48,12 @@ class AutomationEngine:
         self.process = ProcessAutomation()
         self.sales = SalesAutomation()
         self.window = WindowAutomation()
+        self.internet_search = (
+            internet_search or build_default_web_search_service()
+        )
+        self.internet_principal = (
+            internet_principal or build_local_search_principal()
+        )
 
         self._handlers: dict[
             str,
@@ -58,6 +77,15 @@ class AutomationEngine:
 
             # Comercial
             "sales.compose_message": self._sales_compose_message,
+
+            # Agentes consultivos de domínio
+            "domain.programming_assist": self._domain_programming_assist,
+            "domain.radiology_support": self._domain_radiology_support,
+            "domain.wholesale_analysis": self._domain_wholesale_analysis,
+            "domain.industry_analysis": self._domain_industry_analysis,
+
+            # Pesquisa mult fonte
+            "internet.search": self._internet_search,
 
             # Navegador
             "browser.open": self._browser_open,
@@ -253,6 +281,7 @@ class AutomationEngine:
             "o tempo de espera não pode",
             "você precisa informar",
             "parâmetro",
+            "pesquisa bloqueada",
         )
 
         return normalized.startswith(
@@ -359,6 +388,30 @@ class AutomationEngine:
         return self.hr.generate_document(parameters)
 
     # ==========================
+    # Pesquisa mult fonte
+    # ==========================
+
+    def _internet_search(
+        self,
+        parameters: dict[str, Any],
+    ) -> str:
+        query = str(parameters["query"]).strip()
+        max_results = int(parameters.get("max_results", 5))
+        freshness = SearchFreshness(
+            str(parameters.get("freshness", "any")).strip().lower()
+        )
+        request = WebSearchRequest(
+            query=query,
+            max_results=max_results,
+            freshness=freshness,
+        )
+        response = self.internet_search.search(
+            request,
+            self.internet_principal,
+        )
+        return response.format_message()
+
+    # ==========================
     # Comercial
     # ==========================
 
@@ -367,6 +420,34 @@ class AutomationEngine:
         parameters: dict[str, Any],
     ) -> str:
         return self.sales.compose_message(parameters)
+
+    # ==========================
+    # Agentes de domínio
+    # ==========================
+
+    def _domain_programming_assist(
+        self,
+        parameters: dict[str, Any],
+    ) -> str:
+        return self.domains.programming_assist(parameters)
+
+    def _domain_radiology_support(
+        self,
+        parameters: dict[str, Any],
+    ) -> str:
+        return self.domains.radiology_support(parameters)
+
+    def _domain_wholesale_analysis(
+        self,
+        parameters: dict[str, Any],
+    ) -> str:
+        return self.domains.wholesale_analysis(parameters)
+
+    def _domain_industry_analysis(
+        self,
+        parameters: dict[str, Any],
+    ) -> str:
+        return self.domains.industry_analysis(parameters)
 
     # ==========================
     # Navegador

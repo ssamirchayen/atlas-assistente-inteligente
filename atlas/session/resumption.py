@@ -29,6 +29,10 @@ _SAFE_ACTION_TYPES = frozenset(
     {
         "browser.current_url",
         "browser.page_title",
+        "domain.industry_analysis",
+        "domain.programming_assist",
+        "domain.radiology_support",
+        "domain.wholesale_analysis",
         "helpdesk.diagnose",
         "hr.generate_document",
         "sales.compose_message",

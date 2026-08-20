@@ -85,7 +85,11 @@ class AtlasApp:
                 )
 
     def _listen_for_command(self) -> str | None:
-        spoken = self.kernel.speech.listen()
+        profile = self.kernel.speech.performance_profile
+        spoken = self.kernel.speech.listen(
+            timeout=profile.command_timeout,
+            phrase_time_limit=profile.command_phrase_time_limit,
+        )
 
         if not spoken:
             return None
@@ -565,8 +569,11 @@ class AtlasApp:
                 "Pois não?"
             )
 
+            profile = self.kernel.speech.performance_profile
             followup = self.kernel.speech.listen(
-                "Ouvindo seu comando..."
+                "Ouvindo seu comando...",
+                timeout=profile.command_timeout,
+                phrase_time_limit=profile.command_phrase_time_limit,
             )
 
             return (

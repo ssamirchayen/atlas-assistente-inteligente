@@ -8,8 +8,12 @@ from atlas.agents.coding import CodingAgent
 from atlas.agents.desktop import DesktopAgent
 from atlas.agents.helpdesk import HelpDeskAgent
 from atlas.agents.hr import HRAgent
+from atlas.agents.industry import IndustrialOperationsAgent
+from atlas.agents.programming import ProgrammingAdvisorAgent
+from atlas.agents.radiology import RadiologySupportAgent
 from atlas.agents.registry import AgentRegistry
 from atlas.agents.sales import SalesAgent
+from atlas.agents.wholesale import WholesaleAgent
 from atlas.context.manager import ContextManager
 from atlas.intent.analyzer import IntentAnalyzer
 from atlas.planner.actions import Action
@@ -25,11 +29,19 @@ class Planner:
         self.coding_agent = CodingAgent()
         self.helpdesk_agent = HelpDeskAgent()
         self.hr_agent = HRAgent()
+        self.industry_agent = IndustrialOperationsAgent()
+        self.programming_agent = ProgrammingAdvisorAgent()
+        self.radiology_agent = RadiologySupportAgent()
         self.sales_agent = SalesAgent()
+        self.wholesale_agent = WholesaleAgent()
         self.browser_agent = BrowserAgent()
         self.agent_registry = AgentRegistry(
             (
                 self.browser_agent,
+                self.radiology_agent,
+                self.industry_agent,
+                self.wholesale_agent,
+                self.programming_agent,
                 self.hr_agent,
                 self.helpdesk_agent,
                 self.sales_agent,
@@ -128,7 +140,31 @@ class Planner:
 
             return direct_actions
 
-        # 3. Agente especializado em Recursos Humanos.
+        # 3. Agentes consultivos de domínio da Sprint 22.
+        domain_selection = self.agent_registry.route(
+            original_command,
+            candidates=(
+                "radiology",
+                "industry",
+                "wholesale",
+                "programming",
+            ),
+        )
+
+        if domain_selection is not None:
+            if show_logs:
+                print(
+                    "[PLANNER] "
+                    f"{domain_selection.metadata.display_name} "
+                    "reconheceu o comando."
+                )
+
+                for action in domain_selection.actions:
+                    print(f"[PLANO] {action}")
+
+            return list(domain_selection.actions)
+
+        # 4. Agente especializado em Recursos Humanos.
         hr_selection = self.agent_registry.route(
             original_command,
             candidates=("hr",),
@@ -147,7 +183,7 @@ class Planner:
 
             return list(hr_selection.actions)
 
-        # 4. Agente especializado em suporte de TI.
+        # 5. Agente especializado em suporte de TI.
         helpdesk_selection = self.agent_registry.route(
             original_command,
             candidates=("helpdesk",),
@@ -166,7 +202,7 @@ class Planner:
 
             return list(helpdesk_selection.actions)
 
-        # 5. Agente especializado em vendas.
+        # 6. Agente especializado em vendas.
         sales_selection = self.agent_registry.route(
             original_command,
             candidates=("sales",),
@@ -185,7 +221,7 @@ class Planner:
 
             return list(sales_selection.actions)
 
-        # 6. Agente especializado em navegação.
+        # 7. Agente especializado em navegação.
         browser_selection = self.agent_registry.route(
             original_command,
             candidates=("browser",),
@@ -204,7 +240,7 @@ class Planner:
 
             return list(browser_selection.actions)
 
-        # 7. Análise tradicional de intenção.
+        # 8. Análise tradicional de intenção.
         intent = self.intent_analyzer.analyze(original_command)
 
         if show_logs:
@@ -237,7 +273,7 @@ class Planner:
             if desktop_selection is not None:
                 return list(desktop_selection.actions)
 
-        # 8. Fallback dos agentes tradicionais.
+        # 9. Fallback dos agentes tradicionais.
         agent_selection = self.agent_registry.route(
             original_command,
             candidates=("coding", "desktop"),
@@ -253,7 +289,7 @@ class Planner:
 
             return list(agent_selection.actions)
 
-        # 9. Planner Inteligente.
+        # 10. Planner Inteligente.
         intelligent_actions = self.intelligent.plan(
             original_command
         )
@@ -659,6 +695,33 @@ class Planner:
                         type="browser.search",
                         parameters={
                             "query": query,
+                        },
+                    )
+                ]
+
+        # Pesquisa informativa em múltiplas fontes, sem abrir páginas.
+        internet_search_match = re.match(
+            (
+                r"^(?:pesquise|pesquisa|buscar|busque|procure|"
+                r"investigue|consulte)"
+                r"(?:\s+na\s+internet|\s+na\s+web|"
+                r"\s+em\s+varias\s+fontes|\s+em\s+fontes)"
+                r"(?:\s+por|\s+sobre)?\s+(.+)$"
+            ),
+            normalized_command,
+            flags=re.IGNORECASE,
+        )
+
+        if internet_search_match:
+            query = internet_search_match.group(1).strip()
+
+            if query:
+                return [
+                    Action(
+                        type="internet.search",
+                        parameters={
+                            "query": query,
+                            "max_results": 5,
                         },
                     )
                 ]
