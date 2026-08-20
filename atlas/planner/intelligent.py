@@ -33,7 +33,7 @@ class IntelligentPlanner:
         self.tools = tools or ToolRegistry()
         self.safety = safety or SafetyGuard(self.tools)
         self.task_planner = task_planner or TaskPlanner()
-
+       
     def plan(
         self,
         user_text: str,

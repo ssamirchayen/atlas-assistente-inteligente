@@ -15,6 +15,8 @@ COMMANDS_EXECUTE = "commands:execute"
 WORKFLOWS_READ = "workflows:read"
 WORKFLOWS_CANCEL = "workflows:cancel"
 AUDIT_READ = "audit:read"
+SESSIONS_READ = "sessions:read"
+WORKFLOWS_RESUME = "workflows:resume"
 
 ADMIN_SCOPES = frozenset(
     {
@@ -23,6 +25,8 @@ ADMIN_SCOPES = frozenset(
         WORKFLOWS_READ,
         WORKFLOWS_CANCEL,
         AUDIT_READ,
+        SESSIONS_READ,
+        WORKFLOWS_RESUME,
     }
 )
 READ_SCOPES = frozenset({STATUS_READ})

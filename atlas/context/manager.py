@@ -27,7 +27,13 @@ class ContextManager:
     - Contexto das abas do navegador
     """
 
-    def __init__(self, max_turns: int = 10) -> None:
+    def __init__(
+        self,
+        max_turns: int = 10,
+        *,
+        session_manager: SessionManager | None = None,
+        browser_session: BrowserSession | None = None,
+    ) -> None:
         self.history: deque[ConversationTurn] = deque(
             maxlen=max_turns
         )
@@ -41,8 +47,8 @@ class ContextManager:
         self.current_goal: str | None = None
 
         # Gerenciadores especializados
-        self.session = SessionManager()
-        self.browser = BrowserSession()
+        self.session = session_manager or SessionManager()
+        self.browser = browser_session or BrowserSession()
 
     # ======================================================
     # CONVERSA
@@ -121,6 +127,11 @@ class ContextManager:
     def get_browser_session(self) -> BrowserSession:
         return self.browser
 
+    def get_operational_continuity(self) -> dict:
+        """Retorna a continuidade estruturada da sessão atual."""
+
+        return self.session.get_continuity_context().as_dict()
+
     # ======================================================
     # CONTEXTO ESTRUTURADO
     # ======================================================
@@ -135,6 +146,7 @@ class ContextManager:
             "current_goal": self.current_goal,
             "history": self.get_recent_history(),
             "session": self.session.load(),
+            "operational_continuity": self.get_operational_continuity(),
             "browser": self.browser.build_context(),
         }
 

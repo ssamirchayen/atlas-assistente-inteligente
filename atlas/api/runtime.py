@@ -14,6 +14,12 @@ from atlas.core.config import API_COMMAND_TIMEOUT
 
 if TYPE_CHECKING:
     from atlas.gui.service import GuiCommandResult
+    from atlas.session.models import (
+        OperationalEvent,
+        OperationalSession,
+        SessionStatus,
+    )
+    from atlas.session.resumption import ResumptionPlan
 
 WorkflowRuntimeStatus = Literal[
     "running",
@@ -49,6 +55,29 @@ class CommandService(Protocol):
 
     def workflow_snapshot(self) -> WorkflowProgress | None: ...
 
+    def list_operational_sessions(
+        self,
+        *,
+        status: SessionStatus | None = None,
+        limit: int = 20,
+    ) -> tuple[OperationalSession, ...]: ...
+
+    def get_operational_timeline(
+        self,
+        *,
+        session_id: str | None = None,
+        limit: int = 100,
+        after_sequence: int | None = None,
+    ) -> tuple[OperationalEvent, ...]: ...
+
+    def get_resumption_plan(self) -> ResumptionPlan: ...
+
+    def resume_interrupted_workflow(
+        self,
+        *,
+        confirmation_token: str | None = None,
+    ) -> GuiCommandResult: ...
+
     def close(self) -> None: ...
 
 
@@ -72,6 +101,31 @@ class CommandRuntime(Protocol):
         reason: str,
         requested_by: str,
     ) -> WorkflowRuntimeSnapshot: ...
+
+    def list_operational_sessions(
+        self,
+        *,
+        status: SessionStatus | None = None,
+        limit: int = 20,
+    ) -> tuple[OperationalSession, ...]: ...
+
+    def get_operational_timeline(
+        self,
+        *,
+        session_id: str | None = None,
+        limit: int = 100,
+        after_sequence: int | None = None,
+    ) -> tuple[OperationalEvent, ...]: ...
+
+    def get_resumption_plan(self) -> ResumptionPlan: ...
+
+    def resume_interrupted_workflow(
+        self,
+        *,
+        confirmation_token: str | None = None,
+        workflow_id: str | None = None,
+        requested_by: str | None = None,
+    ) -> GuiCommandResult: ...
 
     def close(self) -> None: ...
 
@@ -294,6 +348,88 @@ class AtlasApiRuntime:
         with self._state_lock:
             return self._snapshot_locked(self._workflows[workflow_id])
 
+    def list_operational_sessions(
+        self,
+        *,
+        status: SessionStatus | None = None,
+        limit: int = 20,
+    ) -> tuple[OperationalSession, ...]:
+        service = self._service_for_query()
+        return service.list_operational_sessions(
+            status=status,
+            limit=limit,
+        )
+
+    def get_operational_timeline(
+        self,
+        *,
+        session_id: str | None = None,
+        limit: int = 100,
+        after_sequence: int | None = None,
+    ) -> tuple[OperationalEvent, ...]:
+        service = self._service_for_query()
+        return service.get_operational_timeline(
+            session_id=session_id,
+            limit=limit,
+            after_sequence=after_sequence,
+        )
+
+    def get_resumption_plan(self) -> ResumptionPlan:
+        service = self._service_for_query()
+        return service.get_resumption_plan()
+
+    def resume_interrupted_workflow(
+        self,
+        *,
+        confirmation_token: str | None = None,
+        workflow_id: str | None = None,
+        requested_by: str | None = None,
+    ) -> GuiCommandResult:
+        execution_id = workflow_id or str(uuid4())
+        now = datetime.now(timezone.utc)
+
+        with self._state_lock:
+            if self._closed:
+                raise RuntimeClosedError
+
+            if self._busy:
+                raise RuntimeBusyError
+
+            if execution_id in self._workflows:
+                raise ValueError("O identificador do workflow já existe.")
+
+            self._evict_old_records_locked()
+            self._workflows[execution_id] = _WorkflowRecord(
+                workflow_id=execution_id,
+                requested_by=requested_by,
+                created_at=now,
+                started_at=now,
+            )
+            self._busy = True
+
+        try:
+            future = self._executor.submit(
+                self._resume_on_worker,
+                confirmation_token,
+            )
+        except Exception:
+            with self._state_lock:
+                self._workflows.pop(execution_id, None)
+                self._busy = False
+            raise
+
+        future.add_done_callback(
+            lambda completed: self._command_finished(
+                execution_id,
+                completed,
+            )
+        )
+
+        try:
+            return future.result(timeout=self._timeout_seconds)
+        except TimeoutError as error:
+            raise RuntimeTimeoutError from error
+
     def close(self) -> None:
         with self._state_lock:
             if self._closed:
@@ -306,18 +442,47 @@ class AtlasApiRuntime:
         self._executor.shutdown(wait=True, cancel_futures=False)
 
     def _execute_on_worker(self, command: str) -> GuiCommandResult:
-        if self._service is None:
-            service = self._service_factory()
+        return self._ensure_service_on_worker().execute(command)
 
-            try:
-                service.start()
-            except Exception:
-                service.close()
-                raise
+    def _resume_on_worker(
+        self,
+        confirmation_token: str | None,
+    ) -> GuiCommandResult:
+        return self._ensure_service_on_worker().resume_interrupted_workflow(
+            confirmation_token=confirmation_token,
+        )
 
-            self._service = service
+    def _ensure_service_on_worker(self) -> CommandService:
+        if self._service is not None:
+            return self._service
 
-        return self._service.execute(command)
+        service = self._service_factory()
+
+        try:
+            service.start()
+        except Exception:
+            service.close()
+            raise
+
+        self._service = service
+        return service
+
+    def _service_for_query(self) -> CommandService:
+        with self._state_lock:
+            if self._closed:
+                raise RuntimeClosedError
+
+            service = self._service
+
+        if service is not None:
+            return service
+
+        future = self._executor.submit(self._ensure_service_on_worker)
+
+        try:
+            return future.result(timeout=self._timeout_seconds)
+        except TimeoutError as error:
+            raise RuntimeTimeoutError from error
 
     def _close_on_worker(self) -> None:
         if self._service is None:

@@ -157,6 +157,9 @@ API_AUDIT_MAX_EVENTS = _env_int(
     minimum=100,
 )
 
+SESSION_DB = DATA_DIR / "operational_sessions.db"
+SESSION_FILE = DATA_DIR / "last_session.json"
+
 MIC_ENABLED = os.getenv("ATLAS_MIC", "1") == "1"
 VOICE_ENABLED = os.getenv("ATLAS_VOICE", "1") == "1"
 WAKE_WORD_ENABLED = os.getenv("ATLAS_WAKE_WORD", "1") == "1"

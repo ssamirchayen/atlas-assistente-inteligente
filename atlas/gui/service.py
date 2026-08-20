@@ -14,6 +14,12 @@ _LOGGER = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from atlas.core.kernel import AtlasKernel
+    from atlas.session.models import (
+        OperationalEvent,
+        OperationalSession,
+        SessionStatus,
+    )
+    from atlas.session.resumption import ResumptionPlan
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +32,7 @@ class GuiCommandResult:
     action_count: int = 0
     cancelled: bool = False
     should_close: bool = False
+    reason_code: str | None = None
 
 
 class SerialCommandRunner:
@@ -47,6 +54,17 @@ class SerialCommandRunner:
             raise RuntimeError("O executor de comandos já foi encerrado.")
 
         return self._executor.submit(self._handler, command)
+
+    def submit_callable(
+        self,
+        callback: Callable[[], GuiCommandResult],
+    ) -> Future[GuiCommandResult]:
+        """Executa uma operação especial na mesma thread persistente."""
+
+        if self._closed:
+            raise RuntimeError("O executor de comandos já foi encerrado.")
+
+        return self._executor.submit(callback)
 
     def close(self, cleanup: Callable[[], None] | None = None) -> None:
         if self._closed:
@@ -207,6 +225,80 @@ class AtlasGuiService:
         """Expõe somente os dados necessários à observabilidade da API."""
 
         return self.controller.workflow_snapshot()
+
+    def list_operational_sessions(
+        self,
+        *,
+        status: SessionStatus | None = None,
+        limit: int = 20,
+    ) -> tuple[OperationalSession, ...]:
+        """Lista sessões persistidas usando a fonte oficial do núcleo."""
+
+        return self.kernel.session.list_sessions(
+            status=status,
+            limit=limit,
+        )
+
+    def get_operational_timeline(
+        self,
+        *,
+        session_id: str | None = None,
+        limit: int = 100,
+        after_sequence: int | None = None,
+    ) -> tuple[OperationalEvent, ...]:
+        """Consulta a linha do tempo cronológica da sessão."""
+
+        return self.kernel.session.get_timeline(
+            session_id=session_id,
+            limit=limit,
+            after_sequence=after_sequence,
+        )
+
+    def get_resumption_plan(self) -> ResumptionPlan:
+        """Expõe o plano imutável produzido pelo Controller."""
+
+        return self.controller.get_resumption_plan()
+
+    def resume_interrupted_workflow(
+        self,
+        *,
+        confirmation_token: str | None = None,
+    ) -> GuiCommandResult:
+        """Executa uma retomada já validada e formata o resultado para UI."""
+
+        actions, results = self.controller.resume_interrupted_workflow(
+            confirmation_token=confirmation_token,
+        )
+
+        if not results:
+            return GuiCommandResult(
+                message="A retomada não produziu nenhum resultado.",
+                source="resumption",
+                success=False,
+                reason_code="workflow_resume_empty_result",
+            )
+
+        message = " ".join(str(result) for result in results)
+        success = all(result.success for result in results)
+        reason_code = next(
+            (
+                result.error_code
+                for result in results
+                if result.error_code is not None
+            ),
+            None,
+        )
+        return GuiCommandResult(
+            message=message,
+            source="resumption",
+            success=success,
+            action_count=len(actions),
+            cancelled=any(
+                result.error_code == "workflow_cancelled"
+                for result in results
+            ),
+            reason_code=reason_code,
+        )
 
     def close(self) -> None:
         if self.scheduler_worker is not None and self._started:

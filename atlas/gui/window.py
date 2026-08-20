@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QTextEdit,
@@ -83,6 +84,7 @@ class AtlasWindow(QMainWindow):
         self.listening = False
         self.voice_processing = False
         self.speaking = False
+        self._resume_available = False
 
         self._connect_signals()
         self._configure_window()
@@ -90,6 +92,7 @@ class AtlasWindow(QMainWindow):
         self.voice_session.subscribe(self._on_voice_state_changed)
         self._start_system_monitor()
         self.service.start()
+        self._refresh_resumption_state()
         self._ensure_interruption_monitor()
 
         self.add_atlas_message(
@@ -252,7 +255,7 @@ class AtlasWindow(QMainWindow):
         local_badge.setObjectName("localBadge")
         layout.addWidget(local_badge)
 
-        version = QLabel("ATLAS CORE  •  SPRINT 17")
+        version = QLabel("ATLAS CORE  •  SPRINT 21")
         version.setObjectName("versionLabel")
         layout.addWidget(version)
         return sidebar
@@ -305,6 +308,17 @@ class AtlasWindow(QMainWindow):
         title.setObjectName("conversationTitle")
         header_layout.addWidget(title)
         header_layout.addStretch()
+
+        self.history_button = QPushButton("Histórico")
+        self.history_button.setObjectName("headerButton")
+        self.history_button.clicked.connect(self.show_session_history)
+        header_layout.addWidget(self.history_button)
+
+        self.resume_button = QPushButton("Retomar pendência")
+        self.resume_button.setObjectName("resumeButton")
+        self.resume_button.setEnabled(False)
+        self.resume_button.clicked.connect(self.resume_workflow)
+        header_layout.addWidget(self.resume_button)
 
         self.session_label = QLabel("●  Sessão local ativa")
         self.session_label.setObjectName("sessionLabel")
@@ -446,6 +460,7 @@ class AtlasWindow(QMainWindow):
         else:
             self.set_status("ATENÇÃO")
 
+        self._refresh_resumption_state()
         self._update_controls()
 
         if result.should_close:
@@ -483,6 +498,119 @@ class AtlasWindow(QMainWindow):
             self.add_system_message(
                 "Ainda não existe um workflow ativo para cancelar."
             )
+
+    def show_session_history(self) -> None:
+        """Exibe no chat os eventos recentes da sessão operacional."""
+
+        try:
+            events = self.service.get_operational_timeline(limit=12)
+        except Exception as exc:
+            self.add_system_message(
+                "Não foi possível consultar o histórico operacional: "
+                f"{type(exc).__name__}."
+            )
+            return
+
+        if not events:
+            self.add_system_message(
+                "A sessão atual ainda não possui eventos registrados."
+            )
+            return
+
+        entries: list[str] = []
+
+        for event in events:
+            event_name = event.event_type.value.replace(".", " › ")
+            message = " ".join(event.message.split())
+
+            if len(message) > 110:
+                message = f"{message[:107]}..."
+
+            entries.append(
+                f"#{event.sequence} · {event_name}: {message}"
+            )
+
+        self.add_system_message(
+            "Histórico operacional recente:\n" + "\n".join(entries)
+        )
+
+    def resume_workflow(self) -> None:
+        """Solicita confirmação e retoma somente etapas pendentes."""
+
+        if self.processing:
+            return
+
+        try:
+            plan = self.service.get_resumption_plan()
+        except Exception as exc:
+            self.add_system_message(
+                "Não foi possível consultar a retomada: "
+                f"{type(exc).__name__}."
+            )
+            return
+
+        if not plan.can_resume:
+            self._resume_available = False
+            self.add_system_message(plan.reason)
+            self._update_controls()
+            return
+
+        confirmation_token: str | None = None
+
+        if plan.requires_confirmation:
+            answer = QMessageBox.question(
+                self,
+                "Confirmar retomada",
+                (
+                    f"{plan.reason}\n\n"
+                    f"Etapas pendentes: {len(plan.remaining_steps)}.\n"
+                    "Deseja executar somente as etapas restantes?"
+                ),
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+
+            confirmation_token = plan.confirmation_token
+
+        self.continuous_listener.pause()
+        self.interruption_monitor.arm()
+        self.processing = True
+        self.set_status("EXECUTANDO")
+        self.activity_label.setText(
+            "Retomando as etapas pendentes com segurança..."
+        )
+        self.workflow_label.setText("Retomando")
+        self._update_controls()
+
+        future = self.command_runner.submit_callable(
+            lambda: self.service.resume_interrupted_workflow(
+                confirmation_token=confirmation_token,
+            )
+        )
+        future.add_done_callback(self._command_finished)
+
+    def _refresh_resumption_state(self) -> None:
+        """Atualiza os indicadores sem executar nenhuma ação pendente."""
+
+        try:
+            plan = self.service.get_resumption_plan()
+        except Exception:
+            self._resume_available = False
+        else:
+            self._resume_available = plan.can_resume
+
+        self.resume_button.setEnabled(
+            self._resume_available and not self.processing
+        )
+        self.session_label.setText(
+            "●  Retomada disponível"
+            if self._resume_available
+            else "●  Sessão local ativa"
+        )
 
     def start_listening(self) -> None:
         if (
@@ -807,6 +935,8 @@ class AtlasWindow(QMainWindow):
         self.mic_button.setEnabled(idle and not continuous)
         self.continuous_button.setEnabled(not self.listening)
         self.cancel_button.setEnabled(self.processing)
+        self.history_button.setEnabled(idle)
+        self.resume_button.setEnabled(idle and self._resume_available)
         self.mic_button.setText(
             "Ouvindo..." if self.listening else "Usar microfone"
         )
@@ -1024,6 +1154,27 @@ class AtlasWindow(QMainWindow):
                 color: #157347;
                 font-size: 10px;
                 font-weight: 650;
+            }
+            QPushButton#headerButton,
+            QPushButton#resumeButton {
+                min-height: 14px;
+                background: #F8FAFC;
+                color: #344054;
+                border: 1px solid #D0D8E4;
+                border-radius: 7px;
+                padding: 5px 9px;
+                font-size: 9px;
+            }
+            QPushButton#headerButton:hover,
+            QPushButton#resumeButton:hover {
+                background: #EEF4FF;
+                color: #1D4ED8;
+                border-color: #AFC5F5;
+            }
+            QPushButton#resumeButton {
+                background: #EEF4FF;
+                color: #1D4ED8;
+                border-color: #BBD0FF;
             }
             QTextEdit#chat {
                 background: #FFFFFF;

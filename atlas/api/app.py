@@ -24,9 +24,11 @@ from atlas.api.audit import (
 from atlas.api.auth import (
     AUDIT_READ,
     COMMANDS_EXECUTE,
+    SESSIONS_READ,
     STATUS_READ,
     WORKFLOWS_CANCEL,
     WORKFLOWS_READ,
+    WORKFLOWS_RESUME,
     ApiKeyAuthenticator,
     ApiPrincipal,
     create_authentication_dependency,
@@ -38,10 +40,18 @@ from atlas.api.models import (
     CommandRequest,
     CommandResponse,
     HealthResponse,
+    OperationalEventResponse,
+    OperationalSessionResponse,
+    OperationalSessionsResponse,
+    OperationalTimelineResponse,
     PrincipalResponse,
+    ResumableStepResponse,
+    ResumptionPlanResponse,
     StatusResponse,
     VersionResponse,
     WorkflowCancellationRequest,
+    WorkflowResumptionRequest,
+    WorkflowResumptionResponse,
     WorkflowStatusResponse,
 )
 from atlas.api.runtime import (
@@ -55,6 +65,13 @@ from atlas.api.runtime import (
     WorkflowRuntimeSnapshot,
 )
 from atlas.api.status import AtlasStatusService
+from atlas.session.models import (
+    OperationalEvent,
+    OperationalSession,
+    SessionStatus,
+)
+from atlas.session.resumption import ResumptionPlan
+from atlas.session.storage import SessionStorageError
 from atlas.version import API_VERSION, ATLAS_VERSION
 
 _LOGGER = logging.getLogger(__name__)
@@ -97,6 +114,67 @@ def _audit_response(event: AuditEvent) -> AuditEventResponse:
         status_code=event.status_code,
         duration_ms=event.duration_ms,
         details=event.details,
+    )
+
+
+def _session_response(
+    session: OperationalSession,
+    *,
+    current_session_id: str | None,
+) -> OperationalSessionResponse:
+    return OperationalSessionResponse(
+        session_id=session.session_id,
+        user_id=session.user_id,
+        title=session.title,
+        status=session.status.value,
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+        ended_at=session.ended_at,
+        current=session.session_id == current_session_id,
+    )
+
+
+def _operational_event_response(
+    event: OperationalEvent,
+) -> OperationalEventResponse:
+    return OperationalEventResponse(
+        event_id=event.event_id,
+        session_id=event.session_id,
+        sequence=event.sequence,
+        event_type=event.event_type.value,
+        occurred_at=event.occurred_at,
+        message=event.message,
+        workflow_id=event.workflow_id,
+        action_type=event.action_type,
+        details=dict(event.details),
+    )
+
+
+def _resumption_plan_response(
+    plan: ResumptionPlan,
+) -> ResumptionPlanResponse:
+    return ResumptionPlanResponse(
+        session_id=plan.session_id,
+        status=plan.status.value,
+        reason=plan.reason,
+        source_workflow_id=plan.source_workflow_id,
+        source_sequence=plan.source_sequence,
+        total_steps=plan.total_steps,
+        completed_step_indexes=plan.completed_step_indexes,
+        remaining_steps=tuple(
+            ResumableStepResponse(
+                step_index=step.step_index,
+                step_number=step.step_number,
+                action_type=step.action_type,
+                parameters=dict(step.parameters),
+                risk=step.risk.value,
+                reason=step.reason,
+            )
+            for step in plan.remaining_steps
+        ),
+        confirmation_token=plan.confirmation_token,
+        requires_confirmation=plan.requires_confirmation,
+        can_resume=plan.can_resume,
     )
 
 
@@ -191,6 +269,14 @@ def create_app(
         WORKFLOWS_CANCEL,
     )
     require_audit_read = create_scope_dependency(authenticate, AUDIT_READ)
+    require_sessions_read = create_scope_dependency(
+        authenticate,
+        SESSIONS_READ,
+    )
+    require_workflow_resume = create_scope_dependency(
+        authenticate,
+        WORKFLOWS_RESUME,
+    )
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI):
@@ -273,6 +359,200 @@ def create_app(
             principal_id=principal.principal_id,
             role=principal.role,
             scopes=tuple(sorted(principal.scopes)),
+        )
+
+    @router.get(
+        "/sessions",
+        response_model=OperationalSessionsResponse,
+        tags=["Sessões"],
+        summary="Lista sessões operacionais persistidas",
+        responses={401: {}, 403: {}, 503: {}, 504: {}},
+    )
+    def operational_sessions(
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+        session_status: SessionStatus | None = None,
+        _principal: ApiPrincipal = Depends(require_sessions_read),
+    ) -> OperationalSessionsResponse:
+        try:
+            sessions = runtime.list_operational_sessions(
+                status=session_status,
+                limit=limit,
+            )
+            current_session_id = next(
+                (
+                    session.session_id
+                    for session in sessions
+                    if session.status is SessionStatus.ACTIVE
+                ),
+                None,
+            )
+        except RuntimeTimeoutError as error:
+            raise HTTPException(
+                status_code=504,
+                detail="A consulta de sessões excedeu o tempo limite.",
+            ) from error
+        except (RuntimeClosedError, SessionStorageError) as error:
+            raise HTTPException(
+                status_code=503,
+                detail="As sessões operacionais estão indisponíveis.",
+            ) from error
+
+        return OperationalSessionsResponse(
+            items=tuple(
+                _session_response(
+                    session,
+                    current_session_id=current_session_id,
+                )
+                for session in sessions
+            ),
+            count=len(sessions),
+            limit=limit,
+        )
+
+    @router.get(
+        "/sessions/{session_id}/timeline",
+        response_model=OperationalTimelineResponse,
+        tags=["Sessões"],
+        summary="Consulta a linha do tempo operacional de uma sessão",
+        responses={401: {}, 403: {}, 404: {}, 503: {}, 504: {}},
+    )
+    def operational_timeline(
+        session_id: str,
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+        after_sequence: Annotated[int | None, Query(ge=0)] = None,
+        _principal: ApiPrincipal = Depends(require_sessions_read),
+    ) -> OperationalTimelineResponse:
+        try:
+            events = runtime.get_operational_timeline(
+                session_id=session_id,
+                limit=limit,
+                after_sequence=after_sequence,
+            )
+        except ValueError as error:
+            raise HTTPException(
+                status_code=404,
+                detail="Sessão operacional não encontrada.",
+            ) from error
+        except RuntimeTimeoutError as error:
+            raise HTTPException(
+                status_code=504,
+                detail="A consulta da linha do tempo excedeu o limite.",
+            ) from error
+        except (RuntimeClosedError, SessionStorageError) as error:
+            raise HTTPException(
+                status_code=503,
+                detail="A linha do tempo está indisponível.",
+            ) from error
+
+        return OperationalTimelineResponse(
+            session_id=session_id,
+            items=tuple(
+                _operational_event_response(event) for event in events
+            ),
+            count=len(events),
+            limit=limit,
+            latest_sequence=events[-1].sequence if events else None,
+        )
+
+    @router.get(
+        "/resumption",
+        response_model=ResumptionPlanResponse,
+        tags=["Retomada"],
+        summary="Consulta o plano seguro do workflow interrompido",
+        responses={401: {}, 403: {}, 503: {}, 504: {}},
+    )
+    def resumption_plan(
+        _principal: ApiPrincipal = Depends(require_sessions_read),
+    ) -> ResumptionPlanResponse:
+        try:
+            plan = runtime.get_resumption_plan()
+        except RuntimeTimeoutError as error:
+            raise HTTPException(
+                status_code=504,
+                detail="A consulta de retomada excedeu o tempo limite.",
+            ) from error
+        except (RuntimeClosedError, SessionStorageError) as error:
+            raise HTTPException(
+                status_code=503,
+                detail="O plano de retomada está indisponível.",
+            ) from error
+
+        return _resumption_plan_response(plan)
+
+    @router.post(
+        "/resumption",
+        response_model=WorkflowResumptionResponse,
+        tags=["Retomada"],
+        summary="Executa explicitamente uma retomada segura",
+        responses={401: {}, 403: {}, 409: {}, 503: {}, 504: {}},
+    )
+    def resume_interrupted_workflow(
+        payload: WorkflowResumptionRequest | None = None,
+        principal: ApiPrincipal = Depends(require_workflow_resume),
+    ) -> WorkflowResumptionResponse:
+        request_id = str(uuid4())
+        started_at = perf_counter()
+        record_audit(
+            "workflow.resume_requested",
+            outcome="accepted",
+            status_code=202,
+            principal_id=principal.principal_id,
+            workflow_id=request_id,
+            details={
+                "confirmation_present": bool(
+                    payload and payload.confirmation_token
+                )
+            },
+        )
+
+        try:
+            result = runtime.resume_interrupted_workflow(
+                confirmation_token=(
+                    payload.confirmation_token if payload is not None else None
+                ),
+                workflow_id=request_id,
+                requested_by=principal.principal_id,
+            )
+        except RuntimeBusyError as error:
+            raise HTTPException(
+                status_code=409,
+                detail="O Atlas já está executando outro workflow.",
+            ) from error
+        except RuntimeTimeoutError as error:
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    "A espera da API terminou. Consulte o workflow pelo "
+                    "identificador retornado."
+                ),
+                headers={"X-Workflow-ID": request_id},
+            ) from error
+        except RuntimeClosedError as error:
+            raise HTTPException(
+                status_code=503,
+                detail="O runtime de comandos está encerrado.",
+            ) from error
+
+        duration_ms = round((perf_counter() - started_at) * 1000, 3)
+        record_audit(
+            "workflow.resume_completed",
+            outcome="succeeded" if result.success else "rejected",
+            status_code=200,
+            principal_id=principal.principal_id,
+            workflow_id=request_id,
+            duration_ms=duration_ms,
+            details={
+                "action_count": result.action_count,
+                "reason_code": result.reason_code,
+            },
+        )
+        return WorkflowResumptionResponse(
+            request_id=request_id,
+            message=result.message,
+            success=result.success,
+            action_count=result.action_count,
+            reason_code=result.reason_code,
+            duration_ms=duration_ms,
         )
 
     @router.post(

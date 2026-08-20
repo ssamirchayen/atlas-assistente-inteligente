@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import threading
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from atlas.gui.service import AtlasGuiService, SerialCommandRunner
 from atlas.planner.actions import Action
 from atlas.planner.results import ExecutionResult
+from atlas.session.models import (
+    OperationalEvent,
+    OperationalSession,
+    SessionStatus,
+    TimelineEventType,
+)
+from atlas.session.resumption import ResumptionPlan
 
 
 def make_service(
@@ -250,4 +258,102 @@ def test_serial_runner_runs_cleanup_on_command_thread() -> None:
     runner.close(cleanup=cleanup)
 
     assert cleanup_finished.wait(timeout=2)
+    assert len(set(thread_ids)) == 1
+
+
+def test_service_exposes_operational_session_and_timeline() -> None:
+    service, _, kernel = make_service()
+    now = datetime.now(timezone.utc)
+    session = OperationalSession(
+        session_id="session-gui",
+        user_id="Ssamir",
+        title="Sessão GUI",
+        status=SessionStatus.ACTIVE,
+        created_at=now,
+        updated_at=now,
+        ended_at=None,
+        context={},
+    )
+    event = OperationalEvent(
+        event_id="event-gui",
+        session_id=session.session_id,
+        sequence=1,
+        event_type=TimelineEventType.SESSION_STARTED,
+        occurred_at=now,
+        message="Sessão iniciada.",
+        workflow_id=None,
+        action_type=None,
+        details={},
+    )
+    kernel.session.list_sessions.return_value = (session,)
+    kernel.session.get_timeline.return_value = (event,)
+
+    sessions = service.list_operational_sessions(
+        status=SessionStatus.ACTIVE,
+        limit=5,
+    )
+    events = service.get_operational_timeline(
+        session_id=session.session_id,
+        limit=10,
+        after_sequence=0,
+    )
+
+    assert sessions == (session,)
+    assert events == (event,)
+    kernel.session.list_sessions.assert_called_once_with(
+        status=SessionStatus.ACTIVE,
+        limit=5,
+    )
+    kernel.session.get_timeline.assert_called_once_with(
+        session_id=session.session_id,
+        limit=10,
+        after_sequence=0,
+    )
+
+
+def test_service_exposes_and_executes_resumption_plan() -> None:
+    service, controller, _ = make_service()
+    plan = ResumptionPlan.not_available("session-gui")
+    action = Action(type="system.wait", parameters={"seconds": 0.0})
+    execution = ExecutionResult.ok(
+        "system.wait",
+        "Etapa retomada.",
+    )
+    controller.get_resumption_plan.return_value = plan
+    controller.resume_interrupted_workflow.return_value = (
+        [action],
+        [execution],
+    )
+
+    assert service.get_resumption_plan() is plan
+    result = service.resume_interrupted_workflow(
+        confirmation_token="token-gui"
+    )
+
+    assert result.source == "resumption"
+    assert result.success is True
+    assert result.action_count == 1
+    assert result.message == "Etapa retomada."
+    controller.resume_interrupted_workflow.assert_called_once_with(
+        confirmation_token="token-gui"
+    )
+
+
+def test_serial_runner_executes_callable_on_command_thread() -> None:
+    thread_ids: list[int] = []
+
+    def handler(command: str):
+        thread_ids.append(threading.get_ident())
+        return command
+
+    def special_operation() -> str:
+        thread_ids.append(threading.get_ident())
+        return "retomado"
+
+    runner = SerialCommandRunner(handler)
+    runner.submit("normal").result(timeout=2)
+    result = runner.submit_callable(special_operation).result(timeout=2)
+    runner.close()
+
+    assert result == "retomado"
     assert len(set(thread_ids)) == 1

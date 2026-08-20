@@ -173,3 +173,114 @@ class AuditEventsResponse(ApiModel):
     items: tuple[AuditEventResponse, ...]
     count: int = Field(ge=0)
     limit: int = Field(ge=1, le=200)
+
+
+class OperationalSessionResponse(ApiModel):
+    """Resumo seguro de uma sessão operacional persistida."""
+
+    session_id: str
+    user_id: str
+    title: str
+    status: Literal["active", "paused", "completed", "failed", "cancelled"]
+    created_at: datetime
+    updated_at: datetime
+    ended_at: datetime | None
+    current: bool
+
+
+class OperationalSessionsResponse(ApiModel):
+    """Lista limitada de sessões pertencentes ao usuário local."""
+
+    items: tuple[OperationalSessionResponse, ...]
+    count: int = Field(ge=0)
+    limit: int = Field(ge=1, le=100)
+
+
+class OperationalEventResponse(ApiModel):
+    """Evento estruturado da linha do tempo de uma sessão."""
+
+    event_id: str
+    session_id: str
+    sequence: int = Field(ge=1)
+    event_type: str
+    occurred_at: datetime
+    message: str
+    workflow_id: str | None
+    action_type: str | None
+    details: dict[str, JsonValue]
+
+
+class OperationalTimelineResponse(ApiModel):
+    """Página cronológica de eventos operacionais persistidos."""
+
+    session_id: str
+    items: tuple[OperationalEventResponse, ...]
+    count: int = Field(ge=0)
+    limit: int = Field(ge=1, le=200)
+    latest_sequence: int | None = Field(default=None, ge=1)
+
+
+class ResumableStepResponse(ApiModel):
+    """Etapa ainda pendente em um plano de retomada."""
+
+    step_index: int = Field(ge=0)
+    step_number: int = Field(ge=1)
+    action_type: str
+    parameters: dict[str, JsonValue]
+    risk: Literal["safe", "confirmation_required", "blocked"]
+    reason: str
+
+
+class ResumptionPlanResponse(ApiModel):
+    """Decisão auditável sobre o último workflow interrompido."""
+
+    session_id: str
+    status: Literal[
+        "not_available",
+        "ready",
+        "confirmation_required",
+        "blocked",
+    ]
+    reason: str
+    source_workflow_id: str | None
+    source_sequence: int | None = Field(default=None, ge=1)
+    total_steps: int = Field(ge=0)
+    completed_step_indexes: tuple[int, ...]
+    remaining_steps: tuple[ResumableStepResponse, ...]
+    confirmation_token: str | None
+    requires_confirmation: bool
+    can_resume: bool
+
+
+class WorkflowResumptionRequest(ApiModel):
+    """Confirmação opcional para executar uma retomada pendente."""
+
+    confirmation_token: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+    )
+
+    @field_validator("confirmation_token")
+    @classmethod
+    def normalize_confirmation_token(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        token = value.strip()
+
+        if not token:
+            raise ValueError("O token de confirmação não pode estar vazio.")
+
+        return token
+
+
+class WorkflowResumptionResponse(ApiModel):
+    """Resultado de uma solicitação explícita de retomada."""
+
+    request_id: str
+    message: str
+    success: bool
+    action_count: int = Field(ge=0)
+    reason_code: str | None
+    duration_ms: float = Field(ge=0.0)

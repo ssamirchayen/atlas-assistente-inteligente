@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from atlas.api.runtime import (
@@ -13,6 +14,13 @@ from atlas.api.runtime import (
     RuntimeWorkflowNotFoundError,
 )
 from atlas.gui.service import GuiCommandResult
+from atlas.session.models import (
+    OperationalEvent,
+    OperationalSession,
+    SessionStatus,
+    TimelineEventType,
+)
+from atlas.session.resumption import ResumptionPlan
 
 
 @dataclass
@@ -22,6 +30,7 @@ class FakeService:
     closed: bool = False
     cancelled: bool = False
     thread_ids: list[int] = field(default_factory=list)
+    resume_tokens: list[str | None] = field(default_factory=list)
 
     def start(self) -> None:
         self.started = True
@@ -62,6 +71,68 @@ class FakeService:
             total_steps=2,
             current_step="system.wait",
             cancelled=self.cancelled,
+        )
+
+    def list_operational_sessions(
+        self,
+        *,
+        status: SessionStatus | None = None,
+        limit: int = 20,
+    ) -> tuple[OperationalSession, ...]:
+        now = datetime.now(timezone.utc)
+        session = OperationalSession(
+            session_id="runtime-session",
+            user_id="Ssamir",
+            title="Sessão runtime",
+            status=SessionStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+            ended_at=None,
+            context={},
+        )
+
+        if status not in {None, session.status}:
+            return ()
+
+        return (session,)[:limit]
+
+    def get_operational_timeline(
+        self,
+        *,
+        session_id: str | None = None,
+        limit: int = 100,
+        after_sequence: int | None = None,
+    ) -> tuple[OperationalEvent, ...]:
+        event = OperationalEvent(
+            event_id="runtime-event",
+            session_id=session_id or "runtime-session",
+            sequence=2,
+            event_type=TimelineEventType.COMMAND_COMPLETED,
+            occurred_at=datetime.now(timezone.utc),
+            message="Comando concluído.",
+            workflow_id="runtime-workflow",
+            action_type=None,
+            details={},
+        )
+
+        if after_sequence is not None and event.sequence <= after_sequence:
+            return ()
+
+        return (event,)[:limit]
+
+    def get_resumption_plan(self) -> ResumptionPlan:
+        return ResumptionPlan.not_available("runtime-session")
+
+    def resume_interrupted_workflow(
+        self,
+        *,
+        confirmation_token: str | None = None,
+    ) -> GuiCommandResult:
+        self.resume_tokens.append(confirmation_token)
+        return GuiCommandResult(
+            message="Retomada concluída.",
+            source="resumption",
+            action_count=1,
         )
 
     def close(self) -> None:
@@ -264,3 +335,46 @@ def test_completed_workflow_cannot_be_cancelled() -> None:
         raise AssertionError("O workflow concluído não deveria ser cancelado.")
     finally:
         runtime.close()
+
+
+def test_runtime_exposes_operational_queries_lazily() -> None:
+    service = FakeService()
+    runtime = AtlasApiRuntime(
+        service_factory=lambda: service,
+        timeout_seconds=2,
+    )
+
+    sessions = runtime.list_operational_sessions(limit=5)
+    events = runtime.get_operational_timeline(
+        session_id="runtime-session",
+        after_sequence=1,
+    )
+    plan = runtime.get_resumption_plan()
+    runtime.close()
+
+    assert service.started is True
+    assert sessions[0].session_id == "runtime-session"
+    assert events[0].sequence == 2
+    assert plan.session_id == "runtime-session"
+
+
+def test_runtime_tracks_resumed_workflow() -> None:
+    service = FakeService()
+    runtime = AtlasApiRuntime(
+        service_factory=lambda: service,
+        timeout_seconds=2,
+    )
+
+    result = runtime.resume_interrupted_workflow(
+        confirmation_token="runtime-token",
+        workflow_id="resumed-workflow",
+        requested_by="local-admin",
+    )
+    snapshot = runtime.get_workflow("resumed-workflow")
+    runtime.close()
+
+    assert result.success is True
+    assert service.resume_tokens == ["runtime-token"]
+    assert snapshot.status == "completed"
+    assert snapshot.source == "resumption"
+    assert snapshot.requested_by == "local-admin"
