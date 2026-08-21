@@ -15,6 +15,17 @@ class EdgeTTSProvider:
     volume: str = "+0%"
     pitch: str = "+0Hz"
 
+    def cache_key(self, message: str) -> str:
+        from atlas.voice.tts_cache import TTSFileCache
+
+        return TTSFileCache.key_for(
+            message,
+            voice=self.voice,
+            rate=self.rate,
+            volume=self.volume,
+            pitch=self.pitch,
+        )
+
     def synthesis_command(
         self,
         message: str,

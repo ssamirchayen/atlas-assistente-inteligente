@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Lock
@@ -10,6 +11,13 @@ import speech_recognition as sr
 
 from atlas.core.config import (
     ATLAS_NAME,
+    DATA_DIR,
+    TTS_CACHE_ENABLED,
+    TTS_CACHE_MAX_ENTRIES,
+    TTS_PREFETCH_ENABLED,
+    TTS_PREFETCH_WORKERS,
+    TTS_SENTENCE_PAUSE_MS,
+    TTS_CHUNK_MAX_CHARS,
     TTS_PITCH,
     TTS_PROVIDER,
     TTS_RATE,
@@ -23,15 +31,26 @@ from atlas.voice.profile import (
     VoicePerformanceProfile,
     resolve_voice_profile,
 )
+from atlas.voice.response import sentence_pause_seconds, split_for_speech
 from atlas.voice.session import (
     VoiceSession,
     VoiceState,
     VoiceTransitionError,
 )
 from atlas.voice.tts import EdgeTTSProvider, WindowsSapiProvider
+from atlas.voice.tts_cache import TTSFileCache
+from atlas.voice.pipeline import TTSPrefetchPipeline
+
+
+
+@dataclass(slots=True)
+class _PreparedVoiceChunk:
+    path: Path
+    temporary: bool
 
 
 class SpeechInterface:
+
     def __init__(
         self,
         microphone_enabled: bool = True,
@@ -89,6 +108,15 @@ class SpeechInterface:
             pitch=TTS_PITCH or "+0Hz",
         )
         self.windows_voice = WindowsSapiProvider()
+        self.tts_cache = (
+            TTSFileCache(
+                DATA_DIR / "voice_cache",
+                max_entries=TTS_CACHE_MAX_ENTRIES,
+            )
+            if TTS_CACHE_ENABLED
+            else None
+        )
+        self.tts_chunk_max_chars = TTS_CHUNK_MAX_CHARS
 
     def performance_snapshot(self) -> dict[str, object]:
         """Retorna configuração e métricas sem conteúdo de fala."""
@@ -153,7 +181,74 @@ class SpeechInterface:
             if self.session.is_state(VoiceState.SPEAKING):
                 self.session.complete()
 
+
     def _speak_with_neural_voice(self, message: str) -> bool:
+        chunks = split_for_speech(
+            message,
+            max_chars=self.tts_chunk_max_chars,
+        )
+
+        if not chunks:
+            return True
+
+        if not TTS_PREFETCH_ENABLED or len(chunks) == 1:
+            for chunk in chunks:
+                if self.session.interruption_requested():
+                    return True
+
+                if not self._speak_neural_chunk(chunk):
+                    return False
+
+                self._natural_pause(chunk)
+
+            return True
+
+        pipeline = TTSPrefetchPipeline(
+            self._prepare_neural_chunk,
+            max_workers=TTS_PREFETCH_WORKERS,
+        )
+
+        try:
+            for chunk, prepared in pipeline.iter_prefetched(chunks):
+                if self.session.interruption_requested():
+                    self._cleanup_prepared_chunk(prepared)
+                    return True
+
+                if prepared is None:
+                    return False
+
+                try:
+                    if not self._play_prepared_chunk(prepared):
+                        return False
+                finally:
+                    self._cleanup_prepared_chunk(prepared)
+
+                self._natural_pause(chunk)
+
+            return True
+
+        finally:
+            pipeline.close()
+
+    def _prepare_neural_chunk(
+        self,
+        message: str,
+    ) -> _PreparedVoiceChunk | None:
+        """Sintetiza um trecho sem bloquear a reprodução do atual."""
+
+        cache_key = self.neural_voice.cache_key(message)
+        cached_path = (
+            self.tts_cache.get(cache_key)
+            if self.tts_cache is not None
+            else None
+        )
+
+        if cached_path is not None:
+            return _PreparedVoiceChunk(
+                path=cached_path,
+                temporary=False,
+            )
+
         temporary = NamedTemporaryFile(
             prefix="atlas-voice-",
             suffix=".mp3",
@@ -163,38 +258,99 @@ class SpeechInterface:
         temporary.close()
 
         try:
-            synthesis_result = self._run_speech_process(
+            completed = subprocess.run(
                 self.neural_voice.synthesis_command(
                     message,
                     media_path,
                 ),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 timeout=30,
+                creationflags=getattr(
+                    subprocess,
+                    "CREATE_NO_WINDOW",
+                    0,
+                ),
+                check=False,
             )
 
-            if self.session.interruption_requested():
-                return True
-
             if (
-                synthesis_result != 0
+                completed.returncode != 0
                 or not media_path.is_file()
                 or media_path.stat().st_size == 0
             ):
-                return False
+                media_path.unlink(missing_ok=True)
+                return None
 
-            playback_result = self._run_speech_process(
-                self.neural_voice.playback_command(media_path),
-                timeout=120,
-            )
-            return (
-                playback_result == 0
-                or self.session.interruption_requested()
+            if self.tts_cache is not None:
+                try:
+                    cached_path = self.tts_cache.store(
+                        cache_key,
+                        media_path,
+                    )
+                    media_path.unlink(missing_ok=True)
+
+                    return _PreparedVoiceChunk(
+                        path=cached_path,
+                        temporary=False,
+                    )
+
+                except (OSError, ValueError):
+                    pass
+
+            return _PreparedVoiceChunk(
+                path=media_path,
+                temporary=True,
             )
 
         except (OSError, subprocess.TimeoutExpired):
+            media_path.unlink(missing_ok=True)
+            return None
+
+    def _play_prepared_chunk(
+        self,
+        prepared: _PreparedVoiceChunk,
+    ) -> bool:
+        playback_result = self._run_speech_process(
+            self.neural_voice.playback_command(prepared.path),
+            timeout=120,
+        )
+
+        return (
+            playback_result == 0
+            or self.session.interruption_requested()
+        )
+
+    @staticmethod
+    def _cleanup_prepared_chunk(
+        prepared: _PreparedVoiceChunk | None,
+    ) -> None:
+        if prepared is not None and prepared.temporary:
+            prepared.path.unlink(missing_ok=True)
+
+    def _natural_pause(self, chunk: str) -> None:
+        if self.session.interruption_requested():
+            return
+
+        delay = sentence_pause_seconds(
+            chunk,
+            base_ms=TTS_SENTENCE_PAUSE_MS,
+        )
+
+        if delay > 0:
+            time.sleep(delay)
+
+    def _speak_neural_chunk(self, message: str) -> bool:
+        prepared = self._prepare_neural_chunk(message)
+
+        if prepared is None:
             return False
 
+        try:
+            return self._play_prepared_chunk(prepared)
         finally:
-            media_path.unlink(missing_ok=True)
+            self._cleanup_prepared_chunk(prepared)
 
     def _speak_with_windows_voice(self, message: str) -> bool:
         return (

@@ -67,3 +67,37 @@ Esta etapa reduz janelas de espera quando o perfil `fast` é escolhido, mas aind
 não troca o motor de reconhecimento nem faz streaming de áudio. Naturalidade da
 voz, cache de síntese, início antecipado da reprodução e resposta instantânea
 serão tratados nas próximas etapas da Sprint 23.
+
+## Etapa 2 — início antecipado e cache de síntese
+
+A segunda etapa reduz a percepção de espera do TTS neural sem trocar o provedor.
+Respostas longas agora são divididas em blocos naturais. O primeiro bloco é
+sintetizado e reproduzido antes de o Atlas precisar gerar um MP3 único para a
+resposta inteira.
+
+O Edge TTS também ganhou um cache local limitado. Frases já sintetizadas com a
+mesma voz, velocidade, volume e pitch reutilizam o áudio existente. Os nomes dos
+arquivos são hashes SHA-256 e não contêm a resposta em texto claro.
+
+Configuração:
+
+```text
+ATLAS_TTS_CACHE=1
+ATLAS_TTS_CACHE_MAX_ENTRIES=64
+ATLAS_TTS_CHUNK_MAX_CHARS=260
+```
+
+O cache fica em `data/voice_cache/`, portanto permanece local e fora do Git. O
+limite é aplicado por LRU aproximado; as entradas menos recentes são removidas
+quando o máximo é excedido.
+
+### Ganho esperado
+
+- respostas longas começam a falar mais cedo;
+- respostas repetidas deixam de aguardar nova síntese online;
+- interrupção continua funcionando entre blocos;
+- falha do Edge TTS continua usando o fallback do Windows.
+
+Esta etapa ainda não implementa streaming de áudio em tempo real. Streaming será
+uma evolução separada porque exige controlar reprodução e síntese simultâneas
+sem enfraquecer o mecanismo atual de interrupção.

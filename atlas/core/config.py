@@ -240,6 +240,38 @@ TTS_VOICE = os.getenv("ATLAS_TTS_VOICE", "pt-BR-AntonioNeural").strip()
 TTS_RATE = os.getenv("ATLAS_TTS_RATE", "+0%").strip()
 TTS_VOLUME = os.getenv("ATLAS_TTS_VOLUME", "+0%").strip()
 TTS_PITCH = os.getenv("ATLAS_TTS_PITCH", "+0Hz").strip()
+TTS_CACHE_ENABLED = _env_bool("ATLAS_TTS_CACHE", True)
+TTS_CACHE_MAX_ENTRIES = _env_int(
+    "ATLAS_TTS_CACHE_MAX_ENTRIES",
+    64,
+    minimum=1,
+)
+TTS_CHUNK_MAX_CHARS = _env_int(
+    "ATLAS_TTS_CHUNK_MAX_CHARS",
+    260,
+    minimum=80,
+)
+
+TTS_PREFETCH_ENABLED = _env_bool(
+    "ATLAS_TTS_PREFETCH",
+    True,
+)
+TTS_PREFETCH_WORKERS = min(
+    _env_int(
+        "ATLAS_TTS_PREFETCH_WORKERS",
+        1,
+        minimum=1,
+    ),
+    2,
+)
+TTS_SENTENCE_PAUSE_MS = min(
+    _env_int(
+        "ATLAS_TTS_SENTENCE_PAUSE_MS",
+        90,
+        minimum=0,
+    ),
+    500,
+)
 
 MEMORY_DB = DATA_DIR / "memory.db"
 LOG_FILE = LOG_DIR / "atlas.log"

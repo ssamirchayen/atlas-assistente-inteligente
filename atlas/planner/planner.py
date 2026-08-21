@@ -249,6 +249,18 @@ class Planner:
                 f"({intent.confidence:.2f})"
             )
 
+        # Guard de segurança conversacional:
+        # CHAT deve voltar sem ações para que a camada superior encaminhe
+        # a mensagem ao Brain/Ollama. Nunca deve cair no IntelligentPlanner.
+        if intent.name == "chat":
+            if show_logs:
+                print(
+                    "[PLANNER] Conversa detectada; "
+                    "nenhuma automação será executada."
+                )
+
+            return []
+
         # Tarefas relacionadas à programação.
         if intent.name in {
             "resume_session",
