@@ -21,6 +21,10 @@ from atlas.provisioning.models import (
     StepEvidence,
     StepExecutionStatus,
 )
+from atlas.provisioning.settings import (
+    BlockedManagedSettingsAdapter,
+    ManagedSettingsAdapter,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +44,7 @@ class ProvisioningExecutor:
         winget_path: str | None = None,
         command_timeout: float = 900.0,
         dry_run: bool = True,
+        settings_adapter: ManagedSettingsAdapter | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         root = workspace_root.expanduser().resolve()
@@ -52,6 +57,9 @@ class ProvisioningExecutor:
         self._winget_path = winget_path
         self._command_timeout = command_timeout
         self._dry_run = dry_run
+        self._settings_adapter = (
+            settings_adapter or BlockedManagedSettingsAdapter()
+        )
         self._clock = clock or (lambda: datetime.now(timezone.utc))
 
     @property
@@ -155,6 +163,14 @@ class ProvisioningExecutor:
 
         if step.step_type is ProvisioningStepType.INSTALL_WINGET_PACKAGE:
             return self._install_package(step), None
+
+        if step.step_type in {
+            ProvisioningStepType.CONFIGURE_BROWSER,
+            ProvisioningStepType.CONNECT_PRINTER,
+            ProvisioningStepType.CONFIGURE_VPN,
+            ProvisioningStepType.CONFIGURE_NETWORK,
+        }:
+            return self._settings_adapter.apply(step), None
 
         raise ValueError("Tipo de etapa não autorizado.")
 

@@ -9,6 +9,10 @@ from atlas.core.kernel import AtlasKernel
 from atlas.scheduler.worker import SchedulerWorker
 from atlas.utils.logging_setup import setup_logging
 from atlas.utils.text import remove_wake_word
+from atlas.vision.analyzer import VisionAnalysisError
+from atlas.vision.capture import ScreenCaptureError
+from atlas.vision.formatter import format_analysis_for_user
+from atlas.vision.intent import is_read_only_vision_command
 
 
 class AtlasApp:
@@ -46,6 +50,11 @@ class AtlasApp:
                     continue
 
                 if self._process_priority_router(command):
+                    continue
+
+                # Vision read-only precisa ser resolvido antes do Planner.
+                # Assim, perguntas sobre a tela nunca viram automação.
+                if self._process_vision(command):
                     continue
 
                 # Comandos determinísticos devem ser oferecidos primeiro
@@ -197,6 +206,37 @@ class AtlasApp:
         self.kernel.speech.say(answer)
 
         self._add_turn(command, answer)
+
+
+
+    def _process_vision(
+        self,
+        command: str,
+    ) -> bool:
+        """Resolve perguntas visuais read-only antes do Planner."""
+
+        if not is_read_only_vision_command(command):
+            return False
+
+        try:
+            observation = self.kernel.vision.observe_screen(command)
+            answer = format_analysis_for_user(
+                observation.analysis
+            )
+        except (ScreenCaptureError, VisionAnalysisError) as exc:
+            self.logger.warning(
+                "Falha no Atlas Vision: %s",
+                exc,
+            )
+            answer = (
+                "Não consegui analisar a tela agora. "
+                f"{exc}"
+            )
+
+        print(f"[VISION] {answer}")
+        self.kernel.speech.say(answer)
+        self._add_turn(command, answer)
+        return True
 
     def _process_reasoning(
         self,

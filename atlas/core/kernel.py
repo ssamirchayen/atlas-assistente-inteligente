@@ -18,6 +18,10 @@ from atlas.voice.speech import SpeechInterface
 from atlas.workflow.builder import WorkflowBuilder
 from atlas.workflow.engine import WorkflowEngine
 from atlas.voice.session import VoiceSession
+from atlas.vision.analyzer import OllamaVisionAnalyzer
+from atlas.vision.capture import ScreenCaptureService
+from atlas.vision.service import VisionService
+from atlas.core.config import VISION_CAPTURE_DIR, VISION_KEEP_CAPTURES
 
 
 class AtlasKernel:
@@ -56,6 +60,13 @@ class AtlasKernel:
         # Modelo de linguagem
         self.brain = OllamaBrain(
             self.context
+        )
+
+        # Visão multimodal (somente leitura)
+        self.vision = VisionService(
+            ScreenCaptureService(VISION_CAPTURE_DIR),
+            OllamaVisionAnalyzer(),
+            keep_captures=VISION_KEEP_CAPTURES,
         )
 
         # Camada de raciocínio

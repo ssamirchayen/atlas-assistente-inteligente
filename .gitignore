@@ -10,6 +10,7 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+reports/
 
 # Configurações locais e segredos
 .env
@@ -20,6 +21,8 @@ htmlcov/
 data/*.db
 data/*.db-*
 data/*.json
+data/vision/
+data/edge/
 atlas_data/*.json
 
 # Logs

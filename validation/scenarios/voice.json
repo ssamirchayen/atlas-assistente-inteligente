@@ -1,0 +1,31 @@
+[
+  {
+    "id": "VOICE-001",
+    "title": "Comando simples por voz",
+    "domain": "voice",
+    "execution": "manual",
+    "risk": "low",
+    "preconditions": ["Microfone funcional.", "Voice habilitado."],
+    "steps": ["Dizer: Atlas, abra o navegador."],
+    "expected": ["Wake word reconhecida.", "Comando transcrito uma única vez.", "Navegador aberto.", "Resposta de voz sem repetição."],
+    "metrics": {"target_execution_start_ms": 1000}
+  },
+  {
+    "id": "VOICE-002",
+    "title": "Microfone indisponível",
+    "domain": "voice",
+    "execution": "manual",
+    "risk": "low",
+    "steps": ["Desabilitar o microfone no ambiente de teste.", "Iniciar Voice."],
+    "expected": ["Atlas informa indisponibilidade.", "GUI e texto continuam utilizáveis."]
+  },
+  {
+    "id": "VOICE-003",
+    "title": "Interrupção de fala",
+    "domain": "voice",
+    "execution": "manual",
+    "risk": "low",
+    "steps": ["Fazer Atlas iniciar uma resposta longa.", "Interromper a fala conforme o comando suportado."],
+    "expected": ["Playback interrompido sem travar a sessão."]
+  }
+]

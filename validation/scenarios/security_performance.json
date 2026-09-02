@@ -1,0 +1,70 @@
+[
+  {
+    "id": "SECURITY-001",
+    "title": "Segredos locais protegidos pelo Git",
+    "domain": "security",
+    "execution": "automated",
+    "risk": "high",
+    "checks": [
+      {"type": "path_exists", "path": ".gitignore"},
+      {"type": "text_contains", "path": ".gitignore", "text": ".env"}
+    ],
+    "expected": ["Arquivo .env permanece fora do versionamento normal."]
+  },
+  {
+    "id": "SECURITY-002",
+    "title": "Ação sensível exige política adequada",
+    "domain": "security",
+    "execution": "manual",
+    "risk": "high",
+    "steps": ["Solicitar ação destrutiva em ambiente de teste."],
+    "expected": ["Atlas bloqueia ou exige confirmação/política apropriada.", "Tentativa fica auditável."]
+  },
+  {
+    "id": "PERF-LAB-001",
+    "title": "Benchmark seguro do Validation Lab",
+    "domain": "performance",
+    "execution": "automated",
+    "phase": "sprint-24-stage-1",
+    "risk": "low",
+    "checks": [
+      {"type": "path_exists", "path": "atlas/validation/runner.py"},
+      {"type": "text_contains", "path": "atlas/validation/runner.py", "text": "latency_p95_ms"},
+      {"type": "text_contains", "path": "atlas/validation/runner.py", "text": "memory_delta_mb"}
+    ],
+    "benchmark": {
+      "iterations": 15,
+      "warmup_iterations": 2,
+      "p95_ms_max": 50,
+      "memory_delta_mb_max": 16
+    },
+    "expected": [
+      "Checks declarativos são repetidos sem shell nem ação externa.",
+      "Latências p50/p95, CPU e memória do processo são registradas.",
+      "O cenário falha quando um orçamento configurado é excedido."
+    ],
+    "tags": ["benchmark", "p50", "p95", "cpu", "ram", "quality-gate"]
+  },
+  {
+    "id": "PERF-001",
+    "title": "Benchmark de inicialização",
+    "domain": "performance",
+    "execution": "planned",
+    "phase": "sprint-24",
+    "risk": "low",
+    "metrics": {"measure": ["startup_ms", "idle_cpu_percent", "idle_ram_mb"]},
+    "expected": ["Métricas p50/p95 registradas e comparáveis com baseline."]
+  },
+  {
+    "id": "PERF-LITE-001",
+    "title": "Atlas Lite em máquina com 8 GB RAM",
+    "domain": "performance",
+    "execution": "planned",
+    "phase": "sprint-24",
+    "risk": "low",
+    "preconditions": ["Máquina ou VM limitada a 8 GB de RAM.", "Perfil Atlas Lite selecionado."],
+    "steps": ["Iniciar Atlas.", "Executar voz leve, navegador e automação básica."],
+    "expected": ["Sistema permanece responsivo.", "Sem swap excessivo.", "Módulos pesados permanecem sob demanda."],
+    "metrics": {"target_idle_ram_mb_max": 2560, "target_peak_ram_mb_max": 7000}
+  }
+]

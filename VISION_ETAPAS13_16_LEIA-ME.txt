@@ -1,0 +1,41 @@
+ATLAS VISION — ETAPAS 13 A 16
+================================
+
+INSTALAÇÃO
+
+1. Feche o Atlas.
+2. Extraia este ZIP em C:\Atlas_OFICIAL.
+3. Autorize a substituição dos arquivos.
+4. Seu .env, memória, bancos e logs não fazem parte do ZIP e serão preservados.
+
+VALIDAÇÃO
+
+cd C:\Atlas_OFICIAL
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m compileall -q atlas main.py gui_main.py api_main.py atlas_validation.py
+
+LABORATÓRIO SEGURO
+
+Abra tools\vision_supervised_lab.html pelo navegador controlado pelo Atlas.
+
+Exemplos:
+
+Atlas, marque a caixa de seleção receber novidades
+Atlas, selecione a opção contato por email
+Atlas, enviar o formulário
+CONFIRMAR VISÃO <código exibido pelo Atlas>
+
+O laboratório não envia dados pela rede. A ação final altera somente o título
+e o status da página local.
+
+VALIDAÇÃO DA ENTREGA
+
+- 863 testes aprovados;
+- Ruff aprovado;
+- compilação aprovada;
+- 14 cenários Vision registrados no Validation Lab;
+- nenhum .env, banco, log, cache, captura ou credencial no pacote.
+
+Consulte docs\VISION_ETAPAS13_16_VALIDACAO.md para os detalhes.
+

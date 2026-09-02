@@ -1,0 +1,40 @@
+[
+  {
+    "id": "CORE-001",
+    "title": "Estrutura mínima do Atlas Core",
+    "domain": "core",
+    "execution": "automated",
+    "risk": "low",
+    "tags": ["smoke", "core"],
+    "checks": [
+      {"type": "path_exists", "path": "atlas/core/kernel.py"},
+      {"type": "path_exists", "path": "atlas/core/controller.py"},
+      {"type": "path_exists", "path": "atlas/core/app.py"}
+    ],
+    "expected": ["Kernel, Controller e App presentes no projeto."]
+  },
+  {
+    "id": "CORE-002",
+    "title": "Entrypoints principais presentes",
+    "domain": "core",
+    "execution": "automated",
+    "risk": "low",
+    "tags": ["smoke", "entrypoint"],
+    "checks": [
+      {"type": "path_exists", "path": "main.py"},
+      {"type": "path_exists", "path": "gui_main.py"},
+      {"type": "path_exists", "path": "api_main.py"}
+    ],
+    "expected": ["Entrypoints de terminal, GUI e API disponíveis."]
+  },
+  {
+    "id": "CORE-003",
+    "title": "Falha externa não derruba o Core",
+    "domain": "core",
+    "execution": "manual",
+    "risk": "low",
+    "preconditions": ["Atlas iniciado em ambiente de teste."],
+    "steps": ["Indisponibilizar temporariamente uma dependência externa.", "Executar uma função que dependa dela."],
+    "expected": ["Erro controlado e mensagem clara.", "Core permanece operacional."]
+  }
+]

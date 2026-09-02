@@ -1,0 +1,40 @@
+[
+  {
+    "id": "INSTALL-001",
+    "title": "Instalação limpa pelo Atlas Setup.exe",
+    "domain": "installer",
+    "execution": "planned",
+    "phase": "sprint-24",
+    "risk": "medium",
+    "preconditions": ["VM Windows limpa de teste."],
+    "steps": ["Executar instalador.", "Selecionar Atlas Lite.", "Concluir configuração inicial.", "Abrir Atlas.", "Executar primeiro comando."],
+    "expected": ["Instalação sem Python/PowerShell manual.", "Atlas inicia corretamente.", "Logs do instalador disponíveis."]
+  },
+  {
+    "id": "INSTALL-002",
+    "title": "Atualização e desinstalação limpa",
+    "domain": "installer",
+    "execution": "planned",
+    "phase": "sprint-24",
+    "risk": "medium",
+    "expected": ["Atualização preserva dados permitidos.", "Desinstalação remove binários sem apagar dados do usuário sem consentimento."]
+  },
+  {
+    "id": "ADMIN-001",
+    "title": "Admin Console mostra saúde do Core",
+    "domain": "admin",
+    "execution": "planned",
+    "phase": "sprint-24",
+    "risk": "low",
+    "expected": ["Status de Core, CPU, RAM, GPU/VRAM e serviços exibidos com estado claro."]
+  },
+  {
+    "id": "ADMIN-002",
+    "title": "Falha de conector aparece no painel",
+    "domain": "admin",
+    "execution": "planned",
+    "phase": "sprint-24",
+    "risk": "low",
+    "expected": ["Conector offline gera alerta e evento observável."]
+  }
+]

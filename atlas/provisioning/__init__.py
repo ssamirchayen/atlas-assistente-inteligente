@@ -16,6 +16,8 @@ from atlas.provisioning.inventory import (
 from atlas.provisioning.models import (
     DeviceInventory,
     DirectoryRequirement,
+    ManagedSettingRequirement,
+    ManagedSettingType,
     PackageRequirement,
     ProvisioningApproval,
     ProvisioningEvidence,
@@ -32,13 +34,21 @@ from atlas.provisioning.planner import (
     ProvisioningPlanner,
 )
 from atlas.provisioning.service import ProvisioningService
+from atlas.provisioning.settings import (
+    BlockedManagedSettingsAdapter,
+    ManagedSettingsAdapter,
+)
 
 __all__ = [
     "CommandResult",
     "CommandRunner",
+    "BlockedManagedSettingsAdapter",
     "DeviceInventory",
     "DeviceInventoryCollector",
     "DirectoryRequirement",
+    "ManagedSettingRequirement",
+    "ManagedSettingType",
+    "ManagedSettingsAdapter",
     "NothingToProvisionError",
     "PackageRequirement",
     "ProvisioningApproval",

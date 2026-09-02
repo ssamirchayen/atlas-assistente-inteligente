@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Atlas Vision Form Lab</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 48px auto; max-width: 680px; padding: 0 20px; }
+    h1 { margin-bottom: 20px; }
+    label { display: block; font-weight: 700; margin: 16px 0 6px; }
+    input, select, button { width: 100%; box-sizing: border-box; padding: 12px; font-size: 16px; }
+    .note { padding: 14px; background: #f0f3f8; border-radius: 8px; }
+    button { margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <h1>Atlas Vision — Laboratório Contextual</h1>
+  <p class="note">
+    Página local de teste das Etapas 11 e 12. O botão final está desabilitado
+    de propósito: o Atlas deve preencher/selecionar, mas nunca enviar.
+  </p>
+
+  <label for="name">Nome</label>
+  <input id="name" name="name" aria-label="Nome" placeholder="Digite o nome" />
+
+  <label for="city">Cidade</label>
+  <input id="city" name="city" aria-label="Cidade" placeholder="Digite a cidade" />
+
+  <label for="email">Email</label>
+  <input id="email" name="email" aria-label="Email" placeholder="Digite o email" />
+
+  <label for="state">Estado</label>
+  <select id="state" name="state" aria-label="Estado">
+    <option value="">Selecione</option>
+    <option value="AM">Amazonas</option>
+    <option value="PA">Pará</option>
+    <option value="SP">São Paulo</option>
+  </select>
+
+  <button type="button" disabled>Enviar (desabilitado no laboratório)</button>
+</body>
+</html>

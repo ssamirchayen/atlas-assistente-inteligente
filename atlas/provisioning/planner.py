@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from atlas.provisioning.models import (
     DeviceInventory,
+    ManagedSettingType,
     ProvisioningPlan,
     ProvisioningProfile,
     ProvisioningStep,
@@ -61,6 +62,26 @@ class ProvisioningPlanner:
                     parameters={
                         "package_id": package.package_id,
                         "source": package.source,
+                    },
+                    reversible=False,
+                )
+            )
+
+        setting_step_types = {
+            ManagedSettingType.BROWSER: ProvisioningStepType.CONFIGURE_BROWSER,
+            ManagedSettingType.PRINTER: ProvisioningStepType.CONNECT_PRINTER,
+            ManagedSettingType.VPN: ProvisioningStepType.CONFIGURE_VPN,
+            ManagedSettingType.NETWORK: ProvisioningStepType.CONFIGURE_NETWORK,
+        }
+        for index, setting in enumerate(profile.settings, start=1):
+            steps.append(
+                ProvisioningStep(
+                    step_id=f"setting-{index}",
+                    step_type=setting_step_types[setting.setting_type],
+                    description=setting.description,
+                    parameters={
+                        "setting_id": setting.setting_id,
+                        **dict(setting.parameters),
                     },
                     reversible=False,
                 )

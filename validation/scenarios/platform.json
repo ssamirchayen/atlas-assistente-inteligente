@@ -1,0 +1,45 @@
+[
+  {
+    "id": "API-001",
+    "title": "Estrutura da API disponível",
+    "domain": "api",
+    "execution": "automated",
+    "risk": "low",
+    "checks": [
+      {"type": "path_exists", "path": "atlas/api/app.py"},
+      {"type": "path_exists", "path": "atlas/api/auth.py"},
+      {"type": "path_exists", "path": "atlas/api/audit.py"}
+    ],
+    "expected": ["API, autenticação e auditoria presentes."]
+  },
+  {
+    "id": "CONNECTOR-001",
+    "title": "Fundação de conectores disponível",
+    "domain": "connector",
+    "execution": "automated",
+    "risk": "low",
+    "checks": [
+      {"type": "path_exists", "path": "atlas/connectors/registry.py"},
+      {"type": "path_exists", "path": "atlas/connectors/guard.py"},
+      {"type": "path_exists", "path": "atlas/connectors/audit.py"}
+    ]
+  },
+  {
+    "id": "WORKFLOW-001",
+    "title": "Workflow cancela e retoma com segurança",
+    "domain": "workflow",
+    "execution": "manual",
+    "risk": "low",
+    "steps": ["Iniciar workflow de teste.", "Cancelar no meio.", "Validar estado.", "Retomar quando suportado."],
+    "expected": ["Estado consistente.", "Sem duplicar ações já concluídas."]
+  },
+  {
+    "id": "SCHEDULER-001",
+    "title": "Agendamento executa uma única vez",
+    "domain": "scheduler",
+    "execution": "manual",
+    "risk": "low",
+    "steps": ["Agendar uma tarefa de teste para alguns minutos à frente.", "Aguardar execução."],
+    "expected": ["Tarefa executada no horário esperado.", "Sem execução duplicada."]
+  }
+]

@@ -1,0 +1,377 @@
+[
+  {
+    "id": "VISION-001",
+    "title": "Descrição da tela",
+    "domain": "vision",
+    "execution": "manual",
+    "risk": "low",
+    "steps": [
+      "Abrir uma tela conhecida.",
+      "Perguntar: Atlas, o que você está vendo?"
+    ],
+    "expected": [
+      "Captura correta da tela.",
+      "Descrição coerente.",
+      "Nenhuma ação de mouse/teclado executada."
+    ]
+  },
+  {
+    "id": "VISION-002",
+    "title": "Grounding da barra de pesquisa",
+    "domain": "vision",
+    "execution": "manual",
+    "risk": "low",
+    "steps": [
+      "Abrir Google no navegador controlado.",
+      "Perguntar: Atlas, onde está a barra de pesquisa?"
+    ],
+    "expected": [
+      "DOM grounding priorizado.",
+      "Elemento correto localizado.",
+      "Overlay aparece no elemento.",
+      "Nenhum clique executado."
+    ]
+  },
+  {
+    "id": "VISION-003",
+    "title": "Clique controlado em campo de pesquisa",
+    "domain": "vision",
+    "execution": "manual",
+    "risk": "medium",
+    "steps": [
+      "Abrir Google no navegador controlado.",
+      "Dizer: Atlas, clique na barra de pesquisa."
+    ],
+    "expected": [
+      "Elemento resolvido estruturalmente.",
+      "Somente um clique executado.",
+      "Nenhuma coordenada do modelo visual usada para clicar."
+    ],
+    "tags": [
+      "controlled-action"
+    ]
+  },
+  {
+    "id": "VISION-004",
+    "title": "Verificação pós-ação",
+    "domain": "vision",
+    "execution": "manual",
+    "phase": "vision-stage-7",
+    "risk": "medium",
+    "steps": [
+      "Executar um clique controlado em um campo, botão ou link conhecido.",
+      "Observar o estado da página antes e depois da ação.",
+      "Confirmar a mensagem e o reason_code retornados pelo Atlas."
+    ],
+    "expected": [
+      "Atlas coleta estado pré-ação sem executar interação adicional.",
+      "Após o clique, Atlas verifica foco, navegação, mudança de estado ou UI equivalente.",
+      "Sucesso só é confirmado quando existe evidência pós-ação observável.",
+      "Se a verificação for inconclusiva, o clique não é repetido para evitar duplicidade.",
+      "Nenhuma coordenada do modelo visual é usada para executar a ação."
+    ],
+    "preconditions": [
+      "Navegador controlado pelo Atlas aberto em uma página conhecida.",
+      "Elemento alvo visível e confirmado pelo DOM com confiança mínima de 85%."
+    ],
+    "tags": [
+      "controlled-action",
+      "post-action",
+      "e2e"
+    ]
+  },
+  {
+    "id": "VISION-005",
+    "title": "Grounding estrutural de aplicativo Windows",
+    "domain": "vision",
+    "execution": "manual",
+    "phase": "vision-stage-8",
+    "risk": "low",
+    "steps": [
+      "Instalar pywinauto e reiniciar o Atlas.",
+      "Abrir o Bloco de Notas e deixá-lo em primeiro plano.",
+      "Usar voz/escuta contínua para perguntar: Atlas, onde está o campo de texto?"
+    ],
+    "expected": [
+      "Qt e DOM não assumem o alvo quando o aplicativo externo está ativo.",
+      "Windows UI Automation localiza estruturalmente o controle de edição.",
+      "Overlay é desenhado sobre a geometria UIA real.",
+      "Vision/Qwen fica apenas como fallback read-only."
+    ],
+    "preconditions": [
+      "Windows com pywinauto disponível.",
+      "Aplicativo alvo visível e em primeiro plano."
+    ],
+    "tags": [
+      "uia",
+      "windows",
+      "grounding",
+      "e2e"
+    ]
+  },
+  {
+    "id": "VISION-006",
+    "title": "Ação controlada Windows UI Automation",
+    "domain": "vision",
+    "execution": "manual",
+    "phase": "vision-stage-8",
+    "risk": "medium",
+    "steps": [
+      "Abrir uma aplicação Windows de teste com um botão ou campo não destrutivo.",
+      "Manter a aplicação alvo em primeiro plano.",
+      "Usar voz/escuta contínua para pedir um único clique explícito no elemento."
+    ],
+    "expected": [
+      "DOM é tentado antes de UIA e não encontra alvo de página quando não aplicável.",
+      "UIA exige confiança mínima de 85% e revalida o fingerprint do elemento.",
+      "A ativação usa padrões UIA diretos, sem pyautogui e sem coordenadas do modelo visual.",
+      "Atlas verifica o pós-estado e nunca repete uma ação já enviada quando a confirmação é inconclusiva."
+    ],
+    "preconditions": [
+      "Aplicação de teste externa ao Atlas ativa em primeiro plano.",
+      "Elemento alvo visível, habilitado e exposto pela árvore UIA."
+    ],
+    "tags": [
+      "uia",
+      "windows",
+      "controlled-action",
+      "post-action",
+      "e2e"
+    ]
+  },
+  {
+    "id": "VISION-007",
+    "title": "Controles Windows avançados por UI Automation",
+    "domain": "vision",
+    "execution": "manual",
+    "phase": "vision-stage-9",
+    "risk": "medium",
+    "steps": [
+      "Abrir uma aplicação Windows de teste com checkbox, abas, menu ou lista.",
+      "Pedir uma única ação explícita, por exemplo: marque a caixa de seleção, selecione a aba ou abra o menu.",
+      "Observar a janela alvo, o controle e a resposta pós-ação do Atlas."
+    ],
+    "expected": [
+      "O alvo é resolvido estruturalmente por UI Automation com confiança mínima de 85%.",
+      "Checkbox usa Toggle; abas/listas usam SelectionItem; menus/combos usam ExpandCollapse quando exposto.",
+      "A janela externa é promovida ao foreground antes da ação.",
+      "A ação é idempotente quando o estado solicitado já está satisfeito.",
+      "O pós-estado confirma checked/selected/expanded/focus quando aplicável.",
+      "Nenhum clique por coordenadas, pyautogui ou bbox visual é usado como fallback."
+    ],
+    "preconditions": [
+      "Windows com pywinauto disponível.",
+      "Aplicação externa visível e controles expostos na árvore UIA."
+    ],
+    "tags": [
+      "uia",
+      "windows",
+      "advanced-controls",
+      "controlled-action",
+      "post-action",
+      "e2e"
+    ]
+  },
+  {
+    "id": "VISION-008",
+    "title": "Preenchimento e sequência estrutural verificada",
+    "domain": "vision",
+    "execution": "manual",
+    "phase": "vision-stage-10",
+    "risk": "medium",
+    "steps": [
+      "Abrir o Google pelo navegador controlado pelo Atlas e manter a página ativa.",
+      "Pedir: Atlas, digite Atlas Vision 10 na barra de pesquisa.",
+      "Em uma aplicação Windows com campo editável, pedir um preenchimento explícito.",
+      "Testar uma sequência de dois passos, por exemplo: clique no campo de texto e depois digite Teste Atlas no campo de texto."
+    ],
+    "expected": [
+      "Campos web são resolvidos pelo DOM e preenchidos via Playwright fill, sem teclado físico.",
+      "Campos Windows são resolvidos por UI Automation e preenchidos via Value/Edit pattern quando suportado.",
+      "Campos de senha são bloqueados estruturalmente.",
+      "Cada passo da sequência é reexecutado pelo pipeline seguro e precisa ser confirmado antes do próximo.",
+      "A sequência para imediatamente em falha ou pós-verificação inconclusiva.",
+      "Ações sensíveis como enviar, salvar, excluir, comprar ou pagar não são aceitas em cadeia.",
+      "Nenhuma coordenada do modelo visual é usada para escrita ou sequência."
+    ],
+    "preconditions": [
+      "Vision Etapas 7 a 9 concluídas.",
+      "Navegador Playwright ou aplicação Windows estruturável disponível.",
+      "Elemento alvo visível e com confiança estrutural mínima de 85%."
+    ],
+    "tags": [
+      "structured-fill",
+      "sequence",
+      "dom",
+      "uia",
+      "post-action",
+      "e2e"
+    ]
+  },
+  {
+    "id": "VISION-009",
+    "title": "Formulário contextual multi-campo",
+    "domain": "vision",
+    "execution": "manual",
+    "phase": "vision-stage-11",
+    "risk": "medium",
+    "steps": [
+      "Servir tools/vision_form_lab.html em http://127.0.0.1:8765.",
+      "Abrir a página no navegador controlado pelo Atlas.",
+      "Pedir: Atlas, preencha o formulário com nome: Ssamir; cidade: Manaus; email: teste@atlas.local."
+    ],
+    "expected": [
+      "O Atlas extrai de dois a cinco pares campo/valor explícitos.",
+      "Cada campo é localizado estruturalmente com confiança mínima de 85%, preenchido e verificado antes do próximo.",
+      "Todos os campos permanecem vinculados à mesma aba DOM ou janela UIA.",
+      "Se o contexto mudar entre campos, o formulário é interrompido antes da próxima escrita.",
+      "Campos sensíveis são bloqueados e o formulário nunca é submetido automaticamente.",
+      "Nenhuma escrita por teclado físico, coordenada ou Vision/Qwen é usada como fallback."
+    ],
+    "preconditions": [
+      "Vision Etapa 10 concluída.",
+      "Página ou aplicativo com campos estruturais visíveis."
+    ],
+    "tags": [
+      "form",
+      "context-binding",
+      "structured-fill",
+      "dom",
+      "uia",
+      "post-action",
+      "e2e"
+    ]
+  },
+  {
+    "id": "VISION-010",
+    "title": "Fluxo contextual com preenchimento e seleção DOM",
+    "domain": "vision",
+    "execution": "manual",
+    "phase": "vision-stage-12",
+    "risk": "medium",
+    "steps": [
+      "Servir tools/vision_form_lab.html em http://127.0.0.1:8765 e abrir pelo navegador controlado pelo Atlas.",
+      "Pedir: Atlas, preencha o campo nome com Ssamir e o campo cidade com Manaus e selecione Amazonas no campo estado.",
+      "Observar os campos, o seletor Estado e o botão final desabilitado."
+    ],
+    "expected": [
+      "Nome e Cidade são preenchidos estruturalmente e verificados antes da seleção.",
+      "Estado é resolvido como select DOM nativo com confiança mínima de 85%.",
+      "A opção Amazonas é aplicada via Playwright select_option e confirmada por selected_label/selected_value.",
+      "Todos os passos permanecem vinculados à mesma aba DOM; mudança de contexto interrompe o fluxo.",
+      "Nenhum envio, salvamento ou confirmação final é executado.",
+      "Nenhum clique, teclado físico ou coordenada do Vision/Qwen é usado para selecionar a opção."
+    ],
+    "preconditions": [
+      "Vision Etapa 11 concluída.",
+      "Navegador Playwright ativo na página local do laboratório."
+    ],
+    "tags": [
+      "contextual-flow",
+      "form",
+      "select",
+      "dom",
+      "context-binding",
+      "post-action",
+      "e2e"
+    ]
+  },
+  {
+    "id": "VISION-011",
+    "title": "Checkbox e radio por estado estrutural",
+    "domain": "vision",
+    "execution": "manual",
+    "phase": "vision-stage-13",
+    "risk": "medium",
+    "steps": [
+      "Abrir tools/vision_supervised_lab.html no navegador do Atlas.",
+      "Pedir para marcar e desmarcar Receber novidades.",
+      "Pedir para selecionar Contato por email."
+    ],
+    "expected": [
+      "DOM confirma checkbox/radio com confiança mínima de 85%.",
+      "Playwright usa set_checked sem coordenadas ou teclado físico.",
+      "O estado final é verificado e uma repetição idempotente não altera o controle.",
+      "Falha pós-ação reversível tenta restaurar uma vez o estado anterior."
+    ],
+    "tags": ["control-state", "checkbox", "radio", "post-action", "e2e"]
+  },
+  {
+    "id": "VISION-012",
+    "title": "Confirmação supervisionada de ação final",
+    "domain": "vision",
+    "execution": "manual",
+    "phase": "vision-stage-14",
+    "risk": "medium",
+    "steps": [
+      "Abrir tools/vision_supervised_lab.html no navegador do Atlas.",
+      "Pedir: Atlas, enviar o formulário.",
+      "Confirmar com o código temporário exibido."
+    ],
+    "expected": [
+      "O primeiro comando não executa ação e cria confirmação de uso único.",
+      "O código expira em 120 segundos e permanece vinculado à mesma aba.",
+      "O botão é revalidado antes da ativação.",
+      "A ação não é repetida se a pós-verificação for inconclusiva."
+    ],
+    "tags": ["confirmation", "submit", "single-use", "post-action", "e2e"]
+  },
+  {
+    "id": "VISION-013",
+    "title": "Recuperação limitada e sem duplicidade",
+    "domain": "vision",
+    "execution": "automated",
+    "phase": "vision-stage-15",
+    "risk": "low",
+    "steps": [
+      "Executar os testes da política de recuperação.",
+      "Simular falha antes e depois do envio de uma ação.",
+      "Simular controle reversível com pós-verificação falha."
+    ],
+    "expected": [
+      "Somente falha pré-ação recebe no máximo um retry.",
+      "Ação já enviada nunca é repetida.",
+      "Rollback só é permitido para controle reversível."
+    ],
+    "checks": [
+      {
+        "type": "path_exists",
+        "path": "atlas/tests/test_vision_stage15_recovery.py"
+      },
+      {
+        "type": "path_exists",
+        "path": "atlas/vision/recovery.py"
+      }
+    ],
+    "tags": ["recovery", "idempotency", "rollback", "automated"]
+  },
+  {
+    "id": "VISION-014",
+    "title": "Auditoria Vision redigida",
+    "domain": "vision",
+    "execution": "automated",
+    "phase": "vision-stage-16",
+    "risk": "low",
+    "steps": [
+      "Registrar eventos sintéticos de controle e confirmação.",
+      "Ler o JSONL de auditoria.",
+      "Validar o esquema e a ausência de conteúdo privado."
+    ],
+    "expected": [
+      "A auditoria contém apenas metadados operacionais permitidos.",
+      "URLs, comandos, textos, tokens e fingerprints não são armazenados.",
+      "O tipo de contexto é reduzido a dom, uia, none ou other."
+    ],
+    "checks": [
+      {
+        "type": "path_exists",
+        "path": "atlas/tests/test_vision_stage16_audit.py"
+      },
+      {
+        "type": "path_exists",
+        "path": "atlas/vision/audit.py"
+      }
+    ],
+    "tags": ["audit", "privacy", "automated"]
+  }
+]

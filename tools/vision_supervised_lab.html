@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Atlas Vision Supervised Lab</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 48px auto; max-width: 680px; padding: 0 20px; }
+    h1 { margin-bottom: 20px; }
+    label { display: block; font-weight: 700; margin: 16px 0 6px; }
+    input[type="text"], select, button { width: 100%; box-sizing: border-box; padding: 12px; font-size: 16px; }
+    .choice { display: flex; gap: 10px; align-items: center; font-weight: 400; }
+    .note, #status { padding: 14px; background: #f0f3f8; border-radius: 8px; }
+    button { margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <h1>Atlas Vision — Laboratório Supervisionado</h1>
+  <p class="note">
+    Página local para validar as Etapas 13–16. Nenhum dado sai deste arquivo.
+    O envio apenas atualiza o estado local da página.
+  </p>
+
+  <form id="atlas-form">
+    <label for="name">Nome</label>
+    <input id="name" name="name" type="text" aria-label="Nome" />
+
+    <label for="state">Estado</label>
+    <select id="state" name="state" aria-label="Estado">
+      <option value="">Selecione</option>
+      <option value="AM">Amazonas</option>
+      <option value="PA">Pará</option>
+    </select>
+
+    <label class="choice" for="news">
+      <input id="news" name="news" type="checkbox" aria-label="Receber novidades" />
+      Receber novidades
+    </label>
+
+    <label class="choice" for="email-contact">
+      <input id="email-contact" name="contact" type="radio" aria-label="Contato por email" />
+      Contato por email
+    </label>
+
+    <button id="send" name="send" type="submit" aria-label="Enviar">
+      Enviar
+    </button>
+  </form>
+
+  <p id="status" role="status">Nenhuma ação final executada.</p>
+
+  <script>
+    document.getElementById("atlas-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      document.getElementById("status").textContent = "Envio local confirmado.";
+      document.title = "Atlas Vision Supervised Lab — Confirmado";
+    });
+  </script>
+</body>
+</html>
+

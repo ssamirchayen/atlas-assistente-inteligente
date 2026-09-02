@@ -228,8 +228,55 @@ PROVISIONING_MAX_STEPS = min(
     50,
 )
 
+# Atlas Edge — execução real exige duas liberações explícitas no .env.
+EDGE_EXECUTION_ENABLED = _env_bool("ATLAS_EDGE_EXECUTION_ENABLED", False)
+EDGE_MAX_TASKS = min(
+    _env_int("ATLAS_EDGE_MAX_TASKS", 50, minimum=1),
+    100,
+)
+EDGE_AUDIT_RETENTION_DAYS = min(
+    _env_int("ATLAS_EDGE_AUDIT_RETENTION_DAYS", 90, minimum=1),
+    3650,
+)
+EDGE_AUDIT_MAX_EVENTS = min(
+    _env_int("ATLAS_EDGE_AUDIT_MAX_EVENTS", 10_000, minimum=100),
+    100_000,
+)
+EDGE_MAX_ONBOARDINGS = min(
+    _env_int("ATLAS_EDGE_MAX_ONBOARDINGS", 200, minimum=10),
+    1000,
+)
+EDGE_MAX_ACTIVE_ONBOARDINGS = min(
+    _env_int("ATLAS_EDGE_MAX_ACTIVE_ONBOARDINGS", 20, minimum=1),
+    100,
+)
+
 SESSION_DB = DATA_DIR / "operational_sessions.db"
 SESSION_FILE = DATA_DIR / "last_session.json"
+
+
+# Atlas Vision — fundação visual.
+# Capturas são locais e transitórias por padrão.
+VISION_ENABLED = _env_bool("ATLAS_VISION", True)
+VISION_CAPTURE_DIR = Path(
+    os.getenv(
+        "ATLAS_VISION_CAPTURE_DIR",
+        str(DATA_DIR / "vision"),
+    )
+).expanduser().resolve()
+VISION_KEEP_CAPTURES = _env_bool("ATLAS_VISION_KEEP_CAPTURES", False)
+
+VISION_MODEL = os.getenv(
+    "ATLAS_VISION_MODEL",
+    "qwen2.5vl:3b",
+).strip()
+VISION_TIMEOUT = _env_float(
+    "ATLAS_VISION_TIMEOUT",
+    120.0,
+    minimum=5.0,
+    maximum=600.0,
+)
+
 
 MIC_ENABLED = os.getenv("ATLAS_MIC", "1") == "1"
 VOICE_ENABLED = os.getenv("ATLAS_VOICE", "1") == "1"

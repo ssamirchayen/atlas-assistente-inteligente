@@ -28,6 +28,7 @@ from atlas.gui.service import (
     GuiCommandResult,
     SerialCommandRunner,
 )
+from atlas.gui.vision_overlay import VisionOverlayWindow
 from atlas.voice.continuous import ContinuousVoiceListener
 from atlas.voice.interruption import (
     VoiceInterruptionIntent,
@@ -92,6 +93,7 @@ class AtlasWindow(QMainWindow):
         self.voice_processing = False
         self.speaking = False
         self._resume_available = False
+        self.vision_overlay = VisionOverlayWindow()
 
         self._connect_signals()
         self._configure_window()
@@ -430,6 +432,7 @@ class AtlasWindow(QMainWindow):
         if self.processing:
             return
 
+        self.vision_overlay.hide_overlay()
         self.continuous_listener.pause()
         self.interruption_monitor.arm()
         self.processing = True
@@ -460,6 +463,9 @@ class AtlasWindow(QMainWindow):
         self.activity_label.setText(self._activity_text(result))
         self.add_atlas_message(result.message)
 
+        if result.overlay is not None:
+            self.vision_overlay.show_spec(result.overlay)
+
         if result.cancelled:
             self.set_status("CANCELADO")
         elif result.success:
@@ -483,6 +489,8 @@ class AtlasWindow(QMainWindow):
             return "Execução cancelada com segurança"
         if result.source == "scheduler":
             return "Tarefa adicionada ao agendador"
+        if result.source == "vision_grounding":
+            return "Elemento localizado e marcado na tela"
         if result.action_count:
             return f"{result.action_count} ação(ões) processada(s)"
         return "Resposta concluída"
@@ -1018,6 +1026,8 @@ class AtlasWindow(QMainWindow):
         scrollbar.setValue(scrollbar.maximum())
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self.vision_overlay.hide_overlay()
+        self.vision_overlay.close()
         self.service.cancel()
         self.continuous_listener.stop(wait=True, timeout=3.0)
         self.interruption_monitor.stop(wait=True, timeout=2.0)

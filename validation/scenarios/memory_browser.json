@@ -1,0 +1,38 @@
+[
+  {
+    "id": "MEMORY-001",
+    "title": "Persistência após reinício",
+    "domain": "memory",
+    "execution": "manual",
+    "risk": "low",
+    "steps": ["Salvar uma memória de teste.", "Fechar Atlas.", "Abrir Atlas.", "Consultar a memória."],
+    "expected": ["Memória recuperada corretamente após reinício."]
+  },
+  {
+    "id": "MEMORY-002",
+    "title": "Exclusão de memória",
+    "domain": "memory",
+    "execution": "manual",
+    "risk": "low",
+    "steps": ["Criar uma memória de teste.", "Solicitar exclusão.", "Consultar novamente."],
+    "expected": ["Memória removida.", "Conteúdo excluído não reaparece como memória ativa."]
+  },
+  {
+    "id": "BROWSER-001",
+    "title": "Pesquisa no navegador controlado",
+    "domain": "browser",
+    "execution": "manual",
+    "risk": "low",
+    "steps": ["Solicitar pesquisa web no navegador Atlas."],
+    "expected": ["Pesquisa executada.", "Sessão permanece funcional ao trocar de página/aba."]
+  },
+  {
+    "id": "BROWSER-002",
+    "title": "Recuperação de sessão do navegador",
+    "domain": "browser",
+    "execution": "manual",
+    "risk": "low",
+    "steps": ["Abrir sessão controlada.", "Provocar fechamento inesperado da página de teste.", "Executar novo comando de navegador."],
+    "expected": ["Atlas recupera ou recria a sessão de forma controlada."]
+  }
+]

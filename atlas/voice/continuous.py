@@ -6,8 +6,44 @@ from threading import Event, RLock, Thread, current_thread
 
 from atlas.core.config import ATLAS_NAME
 from atlas.utils.text import remove_wake_word
+from atlas.voice.command_normalizer import normalize_voice_command
 from atlas.voice.session import VoiceState
 from atlas.voice.speech import SpeechInterface
+
+
+@dataclass(frozen=True, slots=True)
+class ContinuousEndpointingPolicy:
+    """Regras de término de frase para a escuta contínua.
+
+    O reconhecimento contínuo precisa tolerar pausas naturais sem herdar o
+    endpoint agressivo do perfil ``fast``. Esses limites são locais à captura
+    contínua e são restaurados imediatamente após cada frase.
+    """
+
+    pause_threshold: float = 2.4
+    non_speaking_duration: float = 0.8
+    minimum_phrase_time_limit: float = 20.0
+
+    def __post_init__(self) -> None:
+        if self.pause_threshold <= 0:
+            raise ValueError("A pausa contínua deve ser positiva.")
+        if self.non_speaking_duration <= 0:
+            raise ValueError("A duração sem fala deve ser positiva.")
+        if self.non_speaking_duration > self.pause_threshold:
+            raise ValueError(
+                "A duração sem fala não pode superar a pausa contínua."
+            )
+        if self.minimum_phrase_time_limit <= 0:
+            raise ValueError("O limite mínimo da frase deve ser positivo.")
+
+
+DEFAULT_CONTINUOUS_ENDPOINTING = ContinuousEndpointingPolicy()
+
+
+@dataclass(frozen=True, slots=True)
+class _RecognizerEndpointSnapshot:
+    pause_threshold: float | None
+    non_speaking_duration: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +75,7 @@ class ContinuousVoiceListener:
         listen_timeout: float = 2.0,
         phrase_time_limit: float = 15.0,
         idle_wait: float = 0.1,
+        endpointing_policy: ContinuousEndpointingPolicy | None = None,
     ) -> None:
         if not callable(on_command):
             raise TypeError("O receptor de comandos deve ser chamável.")
@@ -61,6 +98,9 @@ class ContinuousVoiceListener:
         self.listen_timeout = float(listen_timeout)
         self.phrase_time_limit = float(phrase_time_limit)
         self.idle_wait = float(idle_wait)
+        self.endpointing_policy = (
+            endpointing_policy or DEFAULT_CONTINUOUS_ENDPOINTING
+        )
 
         self._lock = RLock()
         self._stop_event = Event()
@@ -181,13 +221,18 @@ class ContinuousVoiceListener:
                     )
                     continue
 
-                transcript = self.speech.listen(
-                    prompt="",
-                    retry_on_failure=False,
-                    timeout=self.listen_timeout,
-                    phrase_time_limit=self.phrase_time_limit,
-                    verbose=False,
-                )
+                endpoint_snapshot = self._apply_continuous_endpointing()
+
+                try:
+                    transcript = self.speech.listen(
+                        prompt="",
+                        retry_on_failure=False,
+                        timeout=self.listen_timeout,
+                        phrase_time_limit=self._effective_phrase_time_limit(),
+                        verbose=False,
+                    )
+                finally:
+                    self._restore_continuous_endpointing(endpoint_snapshot)
 
                 if not self.is_active or self._pause_event.is_set():
                     self._complete_unhandled_cycle()
@@ -202,6 +247,13 @@ class ContinuousVoiceListener:
                 )
 
                 if not activated or not command:
+                    self._complete_unhandled_cycle()
+                    continue
+
+                command = normalize_voice_command(command)
+
+                if not command:
+                    # Autocorreção explícita ou fala sem comando seguro.
                     self._complete_unhandled_cycle()
                     continue
 
@@ -228,6 +280,77 @@ class ContinuousVoiceListener:
             with self._lock:
                 self._active = False
                 self._thread = None
+
+    def _effective_phrase_time_limit(self) -> float:
+        """Evita cortar comandos longos por um limite do perfil rápido."""
+
+        return max(
+            self.phrase_time_limit,
+            self.endpointing_policy.minimum_phrase_time_limit,
+        )
+
+    def _apply_continuous_endpointing(self) -> _RecognizerEndpointSnapshot:
+        """Aplica endpointing robusto somente durante a captura contínua.
+
+        O perfil ``fast`` continua rápido para o restante do Atlas, mas a
+        escuta contínua ganha margem suficiente para pausas naturais no meio
+        de comandos como ``digite ... na barra de pesquisa``.
+        """
+
+        recognizer = getattr(self.speech, "recognizer", None)
+        if recognizer is None:
+            return _RecognizerEndpointSnapshot(None, None)
+
+        pause_value = getattr(recognizer, "pause_threshold", None)
+        non_speaking_value = getattr(
+            recognizer,
+            "non_speaking_duration",
+            None,
+        )
+
+        pause_previous = (
+            float(pause_value)
+            if isinstance(pause_value, (int, float))
+            else None
+        )
+        non_speaking_previous = (
+            float(non_speaking_value)
+            if isinstance(non_speaking_value, (int, float))
+            else None
+        )
+
+        if pause_previous is not None:
+            recognizer.pause_threshold = max(
+                pause_previous,
+                self.endpointing_policy.pause_threshold,
+            )
+
+        if non_speaking_previous is not None:
+            recognizer.non_speaking_duration = max(
+                non_speaking_previous,
+                self.endpointing_policy.non_speaking_duration,
+            )
+
+        return _RecognizerEndpointSnapshot(
+            pause_previous,
+            non_speaking_previous,
+        )
+
+    def _restore_continuous_endpointing(
+        self,
+        snapshot: _RecognizerEndpointSnapshot,
+    ) -> None:
+        recognizer = getattr(self.speech, "recognizer", None)
+        if recognizer is None:
+            return
+
+        if snapshot.pause_threshold is not None:
+            recognizer.pause_threshold = snapshot.pause_threshold
+
+        if snapshot.non_speaking_duration is not None:
+            recognizer.non_speaking_duration = (
+                snapshot.non_speaking_duration
+            )
 
     def _wait_while_paused(self) -> bool:
         while self.is_active and self._pause_event.is_set():

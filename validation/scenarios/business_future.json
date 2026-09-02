@@ -1,0 +1,317 @@
+[
+  {
+    "id": "EDGE-001",
+    "title": "Fundação segura do ITProvisioningAgent",
+    "domain": "edge",
+    "execution": "automated",
+    "phase": "sprint-23-stage-1",
+    "risk": "low",
+    "checks": [
+      {"type": "path_exists", "path": "atlas/edge/agent.py"},
+      {"type": "path_exists", "path": "atlas/edge/storage.py"},
+      {"type": "path_exists", "path": "atlas/tests/test_edge_agent.py"},
+      {"type": "text_not_contains", "path": "atlas/edge/agent.py", "text": "ProvisioningExecutor"},
+      {"type": "text_not_contains", "path": "atlas/edge/agent.py", "text": "subprocess"}
+    ],
+    "expected": [
+      "Identidade aleatória persiste localmente sem serial ou hostname em claro.",
+      "Cadastro exige aprovação de uso único e revalidação do inventário.",
+      "Heartbeat é sanitizado, ordenado e não transmitido nesta etapa.",
+      "Nenhum programa ou configuração é alterado."
+    ],
+    "tags": ["edge", "enrollment", "inventory", "heartbeat", "automated"]
+  },
+  {
+    "id": "EDGE-002",
+    "title": "Piloto local do agente de computadores",
+    "domain": "edge",
+    "execution": "manual",
+    "phase": "sprint-23-stage-1",
+    "risk": "low",
+    "steps": [
+      "Executar edge_agent_pilot.py.",
+      "Confirmar com SIM em letras maiúsculas.",
+      "Conferir o heartbeat local e a mensagem final."
+    ],
+    "expected": [
+      "Cadastro e heartbeat usam somente uma pasta temporária.",
+      "Nenhum programa, pasta corporativa ou configuração do Windows é alterado.",
+      "O piloto termina informando que nenhuma configuração foi alterada."
+    ],
+    "tags": ["edge", "pilot", "dry-run", "manual"]
+  },
+  {
+    "id": "EDGE-003",
+    "title": "Perfis de funcionário e autorização de plano",
+    "domain": "edge",
+    "execution": "automated",
+    "phase": "sprint-23-stage-2",
+    "risk": "low",
+    "checks": [
+      {"type": "path_exists", "path": "atlas/edge/profiles.py"},
+      {"type": "path_exists", "path": "atlas/edge/profile_service.py"},
+      {"type": "path_exists", "path": "atlas/tests/test_edge_profile_service.py"},
+      {"type": "text_not_contains", "path": "atlas/edge/profile_service.py", "text": "ProvisioningExecutor"},
+      {"type": "text_not_contains", "path": "atlas/edge/profile_service.py", "text": "subprocess"}
+    ],
+    "expected": [
+      "Somente perfis presentes na allowlist da TI podem gerar planos.",
+      "Funcionário, solicitante e aprovador aparecem apenas como hashes.",
+      "Solicitante e aprovador devem ser pessoas distintas.",
+      "Mudança de perfil, vínculo ou inventário invalida a autorização.",
+      "Nenhuma etapa do plano é executada nesta fase."
+    ],
+    "tags": ["edge", "profiles", "approval", "separation-of-duties", "automated"]
+  },
+  {
+    "id": "EDGE-004",
+    "title": "Piloto local de perfil de funcionário",
+    "domain": "edge",
+    "execution": "manual",
+    "phase": "sprint-23-stage-2",
+    "risk": "low",
+    "steps": [
+      "Executar edge_profile_pilot.py.",
+      "Confirmar o cadastro temporário com SIM.",
+      "Revisar o perfil school-sales e suas etapas.",
+      "Confirmar a autorização sem execução com SIM."
+    ],
+    "expected": [
+      "O catálogo exibe somente perfis previamente autorizados.",
+      "O plano lista programas e pastas sem executar comandos.",
+      "O piloto termina informando que nenhuma etapa foi executada."
+    ],
+    "tags": ["edge", "profiles", "pilot", "dry-run", "manual"]
+  },
+  {
+    "id": "EDGE-005",
+    "title": "Fila persistente e execução supervisionada",
+    "domain": "edge",
+    "execution": "automated",
+    "phase": "sprint-23-stage-3",
+    "risk": "medium",
+    "checks": [
+      {"type": "path_exists", "path": "atlas/edge/task_queue.py"},
+      {"type": "path_exists", "path": "atlas/edge/execution.py"},
+      {"type": "path_exists", "path": "atlas/provisioning/settings.py"},
+      {"type": "path_exists", "path": "atlas/tests/test_edge_execution.py"},
+      {"type": "text_not_contains", "path": "atlas/edge/execution.py", "text": "shell=True"},
+      {"type": "text_not_contains", "path": "atlas/edge/execution.py", "text": "subprocess"}
+    ],
+    "expected": [
+      "A autorização é consumida uma única vez ao entrar na fila.",
+      "Tarefa interrompida retorna à fila após reinício.",
+      "Perfil, inventário e etapas são reconstruídos antes da execução.",
+      "Concorrência permite somente um executor por tarefa.",
+      "Dry-run não executa adaptadores nem altera o computador."
+    ],
+    "tags": ["edge", "queue", "restart", "execution", "automated"]
+  },
+  {
+    "id": "EDGE-006",
+    "title": "Piloto de retomada e execução simulada",
+    "domain": "edge",
+    "execution": "manual",
+    "phase": "sprint-23-stage-3",
+    "risk": "low",
+    "steps": [
+      "Executar edge_execution_pilot.py.",
+      "Confirmar cadastro e autorização com SIM.",
+      "Observar a recuperação da tarefa após reinício simulado.",
+      "Confirmar a execução simulada com SIM."
+    ],
+    "expected": [
+      "Programas, pastas, navegador, impressora, VPN e rede aparecem no plano.",
+      "A tarefa interrompida volta ao estado queued.",
+      "Todas as etapas terminam como simuladas.",
+      "Nenhum programa ou configuração é alterado."
+    ],
+    "tags": ["edge", "pilot", "restart", "dry-run", "manual"]
+  },
+  {
+    "id": "EDGE-007",
+    "title": "Governança, isolamento e auditoria do Atlas Edge",
+    "domain": "edge",
+    "execution": "automated",
+    "phase": "sprint-23-stage-4",
+    "risk": "high",
+    "checks": [
+      {"type": "path_exists", "path": "atlas/edge/governance.py"},
+      {"type": "path_exists", "path": "atlas/edge/audit.py"},
+      {"type": "path_exists", "path": "atlas/edge/governed_service.py"},
+      {"type": "path_exists", "path": "atlas/tests/test_edge_governed_service.py"},
+      {"type": "text_not_contains", "path": "atlas/edge/governance.py", "text": "shell=True"},
+      {"type": "text_not_contains", "path": "atlas/edge/governance.py", "text": "subprocess"}
+    ],
+    "expected": [
+      "Cada ação exige uma função corporativa autorizada.",
+      "Atores de outra organização são bloqueados antes da operação.",
+      "Somente perfis, pacotes, configurações e pastas em allowlist passam.",
+      "Solicitante, aprovador e executor possuem responsabilidades separadas.",
+      "Auditoria registra decisões e resultados sem dados pessoais ou segredos."
+    ],
+    "tags": ["edge", "rbac", "policy", "audit", "lgpd", "automated"]
+  },
+  {
+    "id": "EDGE-008",
+    "title": "Piloto de governança em modo simulado",
+    "domain": "edge",
+    "execution": "manual",
+    "phase": "sprint-23-stage-4",
+    "risk": "low",
+    "steps": [
+      "Executar edge_governance_pilot.py.",
+      "Confirmar o início, a aprovação e o dry-run com SIM.",
+      "Conferir o bloqueio da organização externa.",
+      "Conferir o resultado simulado e os eventos auditados."
+    ],
+    "expected": [
+      "A tentativa de outra empresa é recusada.",
+      "Operador, aprovador e executor usam identidades diferentes.",
+      "Todas as etapas terminam como simuladas.",
+      "Nenhum programa, pasta ou configuração é alterado."
+    ],
+    "tags": ["edge", "governance", "audit", "dry-run", "manual"]
+  },
+  {
+    "id": "EDGE-009",
+    "title": "Onboarding persistente de funcionários",
+    "domain": "edge",
+    "execution": "automated",
+    "phase": "sprint-23-stage-5",
+    "risk": "high",
+    "checks": [
+      {"type": "path_exists", "path": "atlas/edge/onboarding.py"},
+      {"type": "path_exists", "path": "atlas/edge/onboarding_store.py"},
+      {"type": "path_exists", "path": "atlas/edge/onboarding_service.py"},
+      {"type": "path_exists", "path": "atlas/tests/test_edge_onboarding_service.py"},
+      {"type": "text_not_contains", "path": "atlas/edge/onboarding_service.py", "text": "shell=True"},
+      {"type": "text_not_contains", "path": "atlas/edge/onboarding.py", "text": "authorization_id"}
+    ],
+    "expected": [
+      "Solicitação, aprovação, fila, execução e resultado formam um único workflow.",
+      "Tokens e autorizações transitórias nunca são persistidos.",
+      "Reinício antes da fila exige novo plano; tarefa enfileirada pode ser retomada.",
+      "Vários funcionários mantêm aprovações independentes.",
+      "Relatório operacional contém somente contadores e IDs seguros."
+    ],
+    "tags": ["edge", "employee", "onboarding", "persistence", "automated"]
+  },
+  {
+    "id": "EDGE-010",
+    "title": "Piloto completo de onboarding em dry-run",
+    "domain": "edge",
+    "execution": "manual",
+    "phase": "sprint-23-stage-5",
+    "risk": "low",
+    "steps": [
+      "Executar edge_onboarding_pilot.py.",
+      "Confirmar cadastro, aprovação e execução com SIM.",
+      "Conferir o ID do onboarding e da tarefa persistente.",
+      "Conferir o resultado simulado e o relatório final."
+    ],
+    "expected": [
+      "Operador, aprovador, executor e auditor usam funções distintas.",
+      "O workflow termina como simulated.",
+      "O relatório mostra um onboarding simulado.",
+      "Nenhum programa, pasta ou configuração é alterado."
+    ],
+    "tags": ["edge", "onboarding", "pilot", "dry-run", "manual"]
+  },
+  {
+    "id": "PROVISION-001",
+    "title": "Provisionamento de PC em modo seguro",
+    "domain": "provisioning",
+    "execution": "manual",
+    "risk": "medium",
+    "steps": ["Executar inventário do PC de teste.", "Gerar plano de provisionamento.", "Validar plano antes de aplicar."],
+    "expected": ["Plano reproduzível e auditável.", "Nenhuma instalação não autorizada."]
+  },
+  {
+    "id": "IND-VFD-001",
+    "title": "Diagnóstico de falha de VFD simulado",
+    "domain": "industrial",
+    "execution": "planned",
+    "phase": "sprint-27",
+    "risk": "high",
+    "preconditions": ["Somente simulador/bancada isolada.", "Modo Diagnóstico."],
+    "steps": ["Simular fault code no INV-04.", "Solicitar diagnóstico ao Atlas."],
+    "expected": ["Consulta manual/modelo correto.", "Causas possíveis apresentadas.", "Nenhum parâmetro alterado."]
+  },
+  {
+    "id": "IND-VFD-002",
+    "title": "Bloqueio de parâmetro incompatível",
+    "domain": "industrial",
+    "execution": "planned",
+    "phase": "sprint-27",
+    "risk": "critical",
+    "preconditions": ["Simulador/bancada isolada.", "Limite de projeto definido em 60 Hz."],
+    "steps": ["Solicitar configuração simulada de 120 Hz."],
+    "expected": ["Parameter Validator rejeita a alteração.", "Nenhuma escrita é enviada ao equipamento.", "Evento auditado."]
+  },
+  {
+    "id": "LOG-001",
+    "title": "Pedido atrasado identificado",
+    "domain": "logistics",
+    "execution": "planned",
+    "phase": "sprint-31",
+    "risk": "low",
+    "steps": ["Carregar dados sintéticos de pedidos.", "Perguntar quais estão atrasados."],
+    "expected": ["Pedidos atrasados identificados com motivo e evidência.", "Nenhuma alteração no ERP sem autorização."]
+  },
+  {
+    "id": "RAD-001",
+    "title": "Fluxo de apoio à radiologia",
+    "domain": "radiology",
+    "execution": "planned",
+    "phase": "sprint-25",
+    "risk": "high",
+    "preconditions": ["Dados de teste/sintéticos.", "Escopo de apoio, não diagnóstico autônomo."],
+    "expected": ["Resultado rastreável, com limites do sistema e revisão profissional quando necessária."]
+  },
+  {
+    "id": "WHOLESALE-001",
+    "title": "Análise de operação atacadista",
+    "domain": "wholesale",
+    "execution": "planned",
+    "phase": "sprint-26",
+    "risk": "low",
+    "expected": ["Consulta e análise sem alterar dados de origem sem autorização."]
+  },
+  {
+    "id": "EDU-001",
+    "title": "Fluxo educacional auditável",
+    "domain": "education",
+    "execution": "planned",
+    "phase": "sprint-28",
+    "risk": "low",
+    "expected": ["Ações registradas e dados pessoais tratados conforme permissões definidas."]
+  },
+  {
+    "id": "FIN-001",
+    "title": "Consulta financeira sem escrita autônoma",
+    "domain": "finance",
+    "execution": "planned",
+    "phase": "sprint-29",
+    "risk": "high",
+    "expected": ["Análise correta e nenhuma transação executada sem fluxo autorizado."]
+  },
+  {
+    "id": "HR-001",
+    "title": "Workflow de RH com permissões",
+    "domain": "hr",
+    "execution": "planned",
+    "phase": "sprint-30",
+    "risk": "high",
+    "expected": ["Dados acessados somente conforme perfil/permissão."]
+  },
+  {
+    "id": "PUBLIC-001",
+    "title": "Atendimento público rastreável",
+    "domain": "public-service",
+    "execution": "planned",
+    "phase": "sprint-32",
+    "risk": "high",
+    "expected": ["Resposta baseada em fonte autorizada e ação auditável."]
+  }
+]

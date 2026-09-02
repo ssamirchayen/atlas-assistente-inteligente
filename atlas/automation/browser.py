@@ -20,6 +20,11 @@ from playwright.sync_api import (
 
 T = TypeVar("T")
 
+_INTERACTIVE_SELECTOR = (
+    "input, textarea, button, a, select, [role], "
+    "[contenteditable='true'], [tabindex]"
+)
+
 if TYPE_CHECKING:
     from atlas.browser.session import BrowserSession
 
@@ -172,6 +177,18 @@ class BrowserAutomation:
                 return candidate
 
         return open_pages[-1]
+
+    def get_structural_context_token(self) -> str | None:
+        """Identifica a aba DOM atual sem expor URL ou conteúdo.
+
+        O token só existe durante a execução e é usado pela Etapa 11 para
+        impedir que um formulário iniciado em uma aba continue em outra.
+        """
+
+        page = self._detect_active_page()
+        if page is None:
+            return None
+        return f"dom:{id(page)}"
 
     def _synchronize_current_page(self) -> Page | None:
         """Atualiza as referências internas para a aba ativa real."""
@@ -533,10 +550,1027 @@ class BrowserAutomation:
                 f"resultado: {error}"
             )
 
+
+    def inspect_visible_interactive_elements(
+        self,
+    ) -> list[dict[str, object]]:
+        """Retorna elementos DOM visíveis da página Playwright ativa.
+
+        A inspeção é somente leitura. Se o navegador do Atlas não estiver
+        realmente em foco, nenhuma informação é retornada.
+        """
+
+        page = self._detect_active_page()
+
+        if page is None:
+            return []
+
+        try:
+            has_focus = bool(
+                page.evaluate("document.hasFocus()")
+            )
+        except Exception:
+            return []
+
+        if not has_focus:
+            return []
+
+        script = r"""
+        (selector) => {
+            const dpr = window.devicePixelRatio || 1;
+            const borderX = Math.max(
+                0,
+                (window.outerWidth - window.innerWidth) / 2
+            );
+            const chromeTop = Math.max(
+                0,
+                window.outerHeight - window.innerHeight - borderX
+            );
+            const contentLeft = window.screenX + borderX;
+            const contentTop = window.screenY + chromeTop;
+
+            const visible = (element, rect) => {
+                if (rect.width < 3 || rect.height < 3) {
+                    return false;
+                }
+
+                const style = window.getComputedStyle(element);
+
+                if (
+                    style.display === "none"
+                    || style.visibility === "hidden"
+                    || Number(style.opacity || "1") <= 0.01
+                ) {
+                    return false;
+                }
+
+                return (
+                    rect.bottom > 0
+                    && rect.right > 0
+                    && rect.top < window.innerHeight
+                    && rect.left < window.innerWidth
+                );
+            };
+
+            return Array.from(
+                document.querySelectorAll(selector)
+            )
+                .slice(0, 1200)
+                .map((element, domIndex) => {
+                    const rect = element.getBoundingClientRect();
+
+                    if (!visible(element, rect)) {
+                        return null;
+                    }
+
+                    let labels = "";
+
+                    try {
+                        if (element.labels) {
+                            labels = Array.from(element.labels)
+                                .map((item) => item.innerText || "")
+                                .join(" ");
+                        }
+                    } catch (_) {
+                        labels = "";
+                    }
+
+                    const text = (
+                        element.innerText
+                        || element.value
+                        || ""
+                    ).trim();
+
+                    return {
+                        dom_index: domIndex,
+                        tag: (
+                            element.tagName || ""
+                        ).toLowerCase(),
+                        role: element.getAttribute("role") || "",
+                        type: element.getAttribute("type") || "",
+                        name: element.getAttribute("name") || "",
+                        aria_label:
+                            element.getAttribute("aria-label") || "",
+                        placeholder:
+                            element.getAttribute("placeholder") || "",
+                        title: element.getAttribute("title") || "",
+                        labels,
+                        text: text.slice(0, 300),
+                        left: (
+                            contentLeft + rect.left
+                        ) * dpr,
+                        top: (
+                            contentTop + rect.top
+                        ) * dpr,
+                        right: (
+                            contentLeft + rect.right
+                        ) * dpr,
+                        bottom: (
+                            contentTop + rect.bottom
+                        ) * dpr
+                    };
+                })
+                .filter(Boolean);
+        }
+        """
+
+        try:
+            result = page.evaluate(
+                script,
+                _INTERACTIVE_SELECTOR,
+            )
+        except Exception:
+            return []
+
+        if not isinstance(result, list):
+            return []
+
+        return [
+            item
+            for item in result
+            if isinstance(item, dict)
+        ]
+
+    def inspect_interaction_state(
+        self,
+        dom_index: int,
+        *,
+        fingerprint: dict[str, str] | None = None,
+        semantic_kind: str = "",
+    ) -> dict[str, object] | None:
+        """Lê o estado da página e do alvo sem executar qualquer ação.
+
+        A observação é usada pela Etapa 7 para comparar o estado antes e
+        depois de um clique controlado. Nenhum mouse/teclado é acionado aqui.
+        """
+
+        if not isinstance(dom_index, int) or dom_index < 0:
+            return None
+
+        page = self._detect_active_page()
+        if page is None:
+            return None
+
+        expected = {
+            str(key): str(value or "").strip()
+            for key, value in (fingerprint or {}).items()
+        }
+
+        script = r"""
+        ([selector, expectedIndex, expected, semanticKind]) => {
+            const elements = Array.from(
+                document.querySelectorAll(selector)
+            );
+
+            const clean = (value) => (
+                value == null
+                    ? ""
+                    : String(value)
+                        .trim()
+                        .replace(/\s+/g, " ")
+                        .toLowerCase()
+                        .slice(0, 300)
+            );
+
+            const visible = (element) => {
+                if (!element) {
+                    return false;
+                }
+
+                const rect = element.getBoundingClientRect();
+                if (rect.width < 3 || rect.height < 3) {
+                    return false;
+                }
+
+                const style = window.getComputedStyle(element);
+                return (
+                    style.display !== "none"
+                    && style.visibility !== "hidden"
+                    && Number(style.opacity || "1") > 0.01
+                    && rect.bottom > 0
+                    && rect.right > 0
+                    && rect.top < window.innerHeight
+                    && rect.left < window.innerWidth
+                );
+            };
+
+            const snapshot = (element) => {
+                if (!element) {
+                    return null;
+                }
+
+                const tag = clean(
+                    (element.tagName || "").toLowerCase()
+                );
+                const role = clean(element.getAttribute("role"));
+                const value = (
+                    "value" in element
+                        ? clean(element.value)
+                        : ""
+                );
+
+                return {
+                    exists: true,
+                    focused: document.activeElement === element,
+                    tag,
+                    role,
+                    type: clean(element.getAttribute("type")),
+                    name: clean(element.getAttribute("name")),
+                    aria_label: clean(
+                        element.getAttribute("aria-label")
+                    ),
+                    placeholder: clean(
+                        element.getAttribute("placeholder")
+                    ),
+                    title: clean(element.getAttribute("title")),
+                    text: clean(
+                        element.innerText
+                        || value
+                        || ""
+                    ),
+                    value,
+                    selected_value: (
+                        tag === "select"
+                            ? clean(element.value)
+                            : ""
+                    ),
+                    selected_label: (
+                        tag === "select"
+                        && element.selectedOptions
+                        && element.selectedOptions.length
+                            ? clean(element.selectedOptions[0].textContent)
+                            : ""
+                    ),
+                    disabled: Boolean(element.disabled),
+                    checked: (
+                        typeof element.checked === "boolean"
+                            ? Boolean(element.checked)
+                            : null
+                    ),
+                    aria_pressed: clean(
+                        element.getAttribute("aria-pressed")
+                    ),
+                    aria_expanded: clean(
+                        element.getAttribute("aria-expanded")
+                    ),
+                    aria_selected: clean(
+                        element.getAttribute("aria-selected")
+                    )
+                };
+            };
+
+            const isTextEntry = (data) => (
+                data
+                && (
+                    data.tag === "input"
+                    || data.tag === "textarea"
+                    || data.role === "searchbox"
+                    || data.role === "textbox"
+                    || data.role === "combobox"
+                )
+            );
+
+            const resolveTarget = () => {
+                if (semanticKind === "search_input") {
+                    let bestIndex = -1;
+                    let bestScore = -1;
+
+                    elements.forEach((element, index) => {
+                        if (!visible(element)) {
+                            return;
+                        }
+
+                        const data = snapshot(element);
+                        if (!isTextEntry(data)) {
+                            return;
+                        }
+
+                        let score = 0;
+                        if (data.role === "searchbox") score += 100;
+                        if (data.name === "q") score += 95;
+                        if (data.type === "search") score += 85;
+                        if (data.tag === "textarea") score += 70;
+                        if (data.role === "combobox") score += 65;
+                        if (data.role === "textbox") score += 60;
+                        if (data.tag === "input") score += 55;
+
+                        if (
+                            data.aria_label.includes("pesquis")
+                            || data.aria_label.includes("search")
+                            || data.aria_label.includes("busca")
+                        ) {
+                            score += 50;
+                        }
+
+                        if (
+                            data.placeholder.includes("pesquis")
+                            || data.placeholder.includes("search")
+                            || data.placeholder.includes("busca")
+                        ) {
+                            score += 45;
+                        }
+
+                        Object.keys(expected || {}).forEach((key) => {
+                            const expectedValue = clean(expected[key]);
+                            if (
+                                expectedValue
+                                && clean(data[key]) === expectedValue
+                            ) {
+                                score += 6;
+                            }
+                        });
+
+                        if (index === expectedIndex) {
+                            score += 2;
+                        }
+
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestIndex = index;
+                        }
+                    });
+
+                    if (bestIndex >= 0 && bestScore >= 90) {
+                        return bestIndex;
+                    }
+                }
+
+                const weights = {
+                    aria_label: 10,
+                    name: 9,
+                    placeholder: 8,
+                    role: 6,
+                    type: 5,
+                    tag: 4,
+                    title: 3,
+                    text: 2
+                };
+                const expectedKeys = Object.keys(weights)
+                    .filter((key) => clean(expected[key]));
+
+                if (!expectedKeys.length) {
+                    const item = elements[expectedIndex];
+                    return item && visible(item)
+                        ? expectedIndex
+                        : -1;
+                }
+
+                let bestIndex = -1;
+                let bestScore = -1;
+
+                elements.forEach((element, index) => {
+                    if (!visible(element)) {
+                        return;
+                    }
+
+                    const current = snapshot(element);
+                    let score = 0;
+                    let possible = 0;
+
+                    expectedKeys.forEach((key) => {
+                        const expectedValue = clean(expected[key]);
+                        const currentValue = clean(current[key]);
+                        const weight = weights[key];
+                        possible += weight;
+
+                        if (
+                            currentValue
+                            && currentValue === expectedValue
+                        ) {
+                            score += weight;
+                        }
+                    });
+
+                    if (index === expectedIndex) {
+                        score += 1;
+                        possible += 1;
+                    }
+
+                    const ratio = possible > 0
+                        ? score / possible
+                        : 0;
+
+                    if (ratio > bestScore) {
+                        bestScore = ratio;
+                        bestIndex = index;
+                    }
+                });
+
+                return bestScore >= 0.62
+                    ? bestIndex
+                    : -1;
+            };
+
+            const targetIndex = resolveTarget();
+            const target = (
+                targetIndex >= 0
+                    ? snapshot(elements[targetIndex])
+                    : null
+            );
+            const active = snapshot(document.activeElement);
+            const interactiveCount = elements.filter(visible).length;
+
+            return {
+                url: String(window.location.href || ""),
+                title: String(document.title || ""),
+                has_focus: document.hasFocus(),
+                visibility_state: document.visibilityState,
+                interactive_count: interactiveCount,
+                dialog_count: document.querySelectorAll(
+                    "[role='dialog'], dialog[open]"
+                ).length,
+                expanded_count: document.querySelectorAll(
+                    "[aria-expanded='true']"
+                ).length,
+                target_index: targetIndex,
+                target: target || {exists: false, focused: false},
+                active: active || {exists: false, focused: false}
+            };
+        }
+        """
+
+        try:
+            result = page.evaluate(
+                script,
+                [
+                    _INTERACTIVE_SELECTOR,
+                    dom_index,
+                    expected,
+                    semantic_kind,
+                ],
+            )
+        except Exception:
+            return None
+
+        return result if isinstance(result, dict) else None
+
     # ==================================================
     # INTERAÇÃO
     # ==================================================
 
+
+
+    def click_interactive_element(
+        self,
+        dom_index: int,
+        *,
+        fingerprint: dict[str, str] | None = None,
+        semantic_kind: str = "",
+    ) -> bool:
+        """Clica um elemento DOM revalidado imediatamente antes da ação.
+
+        A identidade textual/semântica do elemento é preferida ao índice
+        original, pois páginas modernas podem recriar nós entre grounding
+        e clique.
+        """
+
+        if not isinstance(dom_index, int) or dom_index < 0:
+            return False
+
+        page = self._detect_active_page()
+
+        if page is None:
+            return False
+
+        expected = {
+            str(key): str(value or "").strip()
+            for key, value in (
+                fingerprint or {}
+            ).items()
+        }
+
+        # Foco pode oscilar por alguns milissegundos enquanto a voz/GUI
+        # atualiza. Aguarda brevemente, mas nunca força foco na janela.
+        focused = False
+
+        for _ in range(4):
+            try:
+                focused = bool(
+                    page.evaluate(
+                        "document.hasFocus()"
+                    )
+                )
+            except Exception:
+                return False
+
+            if focused:
+                break
+
+            try:
+                page.wait_for_timeout(120)
+            except Exception:
+                return False
+
+        if not focused:
+            return False
+
+        resolver_script = r"""
+        ([selector, expectedIndex, expected, semanticKind]) => {
+            const elements = Array.from(
+                document.querySelectorAll(selector)
+            );
+
+            const clean = (value) => (
+                value == null
+                    ? ""
+                    : String(value)
+                        .trim()
+                        .replace(/\s+/g, " ")
+                        .toLowerCase()
+                        .slice(0, 300)
+            );
+
+            const visible = (element) => {
+                const rect = element.getBoundingClientRect();
+
+                if (rect.width < 3 || rect.height < 3) {
+                    return false;
+                }
+
+                const style = window.getComputedStyle(element);
+
+                return (
+                    style.display !== "none"
+                    && style.visibility !== "hidden"
+                    && Number(style.opacity || "1") > 0.01
+                    && rect.bottom > 0
+                    && rect.right > 0
+                    && rect.top < window.innerHeight
+                    && rect.left < window.innerWidth
+                );
+            };
+
+            const snapshot = (element) => ({
+                tag: clean(
+                    (element.tagName || "").toLowerCase()
+                ),
+                role: clean(
+                    element.getAttribute("role")
+                ),
+                type: clean(
+                    element.getAttribute("type")
+                ),
+                name: clean(
+                    element.getAttribute("name")
+                ),
+                aria_label: clean(
+                    element.getAttribute("aria-label")
+                ),
+                placeholder: clean(
+                    element.getAttribute("placeholder")
+                ),
+                title: clean(
+                    element.getAttribute("title")
+                ),
+                text: clean(
+                    element.innerText
+                    || element.value
+                    || ""
+                )
+            });
+
+            const isTextEntry = (data) => (
+                data.tag === "input"
+                || data.tag === "textarea"
+                || data.role === "searchbox"
+                || data.role === "textbox"
+                || data.role === "combobox"
+            );
+
+            if (semanticKind === "search_input") {
+                let bestIndex = -1;
+                let bestScore = -1;
+
+                elements.forEach((element, index) => {
+                    if (!visible(element)) {
+                        return;
+                    }
+
+                    const data = snapshot(element);
+
+                    if (!isTextEntry(data)) {
+                        return;
+                    }
+
+                    let score = 0;
+
+                    if (data.role === "searchbox") score += 100;
+                    if (data.name === "q") score += 95;
+                    if (data.type === "search") score += 85;
+                    if (data.tag === "textarea") score += 70;
+                    if (data.role === "combobox") score += 65;
+                    if (data.role === "textbox") score += 60;
+                    if (data.tag === "input") score += 55;
+
+                    if (
+                        data.aria_label.includes("pesquis")
+                        || data.aria_label.includes("search")
+                        || data.aria_label.includes("busca")
+                    ) {
+                        score += 50;
+                    }
+
+                    if (
+                        data.placeholder.includes("pesquis")
+                        || data.placeholder.includes("search")
+                        || data.placeholder.includes("busca")
+                    ) {
+                        score += 45;
+                    }
+
+                    Object.keys(expected || {}).forEach((key) => {
+                        const expectedValue = clean(expected[key]);
+
+                        if (
+                            expectedValue
+                            && clean(data[key]) === expectedValue
+                        ) {
+                            score += 6;
+                        }
+                    });
+
+                    if (index === expectedIndex) {
+                        score += 2;
+                    }
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestIndex = index;
+                    }
+                });
+
+                if (bestIndex >= 0 && bestScore >= 90) {
+                    return bestIndex;
+                }
+            }
+
+            const weights = {
+                aria_label: 10,
+                name: 9,
+                placeholder: 8,
+                role: 6,
+                type: 5,
+                tag: 4,
+                title: 3,
+                text: 2
+            };
+
+            const expectedKeys = Object.keys(weights)
+                .filter((key) => clean(expected[key]));
+
+            if (!expectedKeys.length) {
+                const item = elements[expectedIndex];
+
+                return (
+                    item && visible(item)
+                    ? expectedIndex
+                    : -1
+                );
+            }
+
+            let bestIndex = -1;
+            let bestScore = -1;
+
+            elements.forEach((element, index) => {
+                if (!visible(element)) {
+                    return;
+                }
+
+                const current = snapshot(element);
+                let score = 0;
+                let possible = 0;
+
+                expectedKeys.forEach((key) => {
+                    const expectedValue = clean(expected[key]);
+                    const currentValue = clean(current[key]);
+                    const weight = weights[key];
+
+                    possible += weight;
+
+                    if (
+                        currentValue
+                        && currentValue === expectedValue
+                    ) {
+                        score += weight;
+                    }
+                });
+
+                if (index === expectedIndex) {
+                    score += 1;
+                    possible += 1;
+                }
+
+                const ratio = (
+                    possible > 0
+                        ? score / possible
+                        : 0
+                );
+
+                if (ratio > bestScore) {
+                    bestScore = ratio;
+                    bestIndex = index;
+                }
+            });
+
+            return bestScore >= 0.62
+                ? bestIndex
+                : -1;
+        }
+        """
+
+        def resolve_index() -> int:
+            try:
+                resolved = page.evaluate(
+                    resolver_script,
+                    [
+                        _INTERACTIVE_SELECTOR,
+                        dom_index,
+                        expected,
+                        semantic_kind,
+                    ],
+                )
+                return int(resolved)
+            except (
+                TypeError,
+                ValueError,
+                PlaywrightError,
+            ):
+                return -1
+            except Exception:
+                return -1
+
+        # Uma segunda tentativa é permitida para DOM que se recria
+        # durante animação/autocomplete, sempre revalidando identidade.
+        for attempt in range(2):
+            current_index = resolve_index()
+
+            if current_index < 0:
+                return False
+
+            try:
+                locator = page.locator(
+                    _INTERACTIVE_SELECTOR
+                ).nth(current_index)
+
+                locator.wait_for(
+                    state="visible",
+                    timeout=2_500,
+                )
+                locator.scroll_into_view_if_needed(
+                    timeout=2_500,
+                )
+
+                # Trial verifica actionability sem executar o clique.
+                locator.click(
+                    timeout=2_500,
+                    trial=True,
+                )
+
+                locator.click(
+                    timeout=4_000,
+                )
+                return True
+
+            except (
+                PlaywrightError,
+                PlaywrightTimeoutError,
+            ):
+                if attempt == 0:
+                    try:
+                        page.wait_for_timeout(160)
+                    except Exception:
+                        return False
+                    continue
+
+                return False
+            except Exception:
+                return False
+
+        return False
+
+    def fill_interactive_element(
+        self,
+        dom_index: int,
+        text: str,
+        *,
+        fingerprint: dict[str, str] | None = None,
+        semantic_kind: str = "",
+    ) -> bool:
+        """Preenche um campo DOM revalidado sem usar teclado físico.
+
+        A Etapa 10 reaproveita o resolvedor estrutural da Etapa 7: o alvo é
+        reencontrado imediatamente antes do ``fill`` e campos de senha são
+        recusados. Não existe fallback para coordenadas, mouse ou teclado.
+        """
+
+        if not isinstance(dom_index, int) or dom_index < 0 or not text:
+            return False
+
+        page = self._detect_active_page()
+        if page is None:
+            return False
+
+        focused = False
+        for _ in range(4):
+            try:
+                focused = bool(page.evaluate("document.hasFocus()"))
+            except Exception:
+                return False
+
+            if focused:
+                break
+
+            try:
+                page.wait_for_timeout(120)
+            except Exception:
+                return False
+
+        if not focused:
+            return False
+
+        state = self.inspect_interaction_state(
+            dom_index,
+            fingerprint=fingerprint,
+            semantic_kind=semantic_kind,
+        )
+        if not isinstance(state, dict):
+            return False
+
+        target = state.get("target")
+        if not isinstance(target, dict):
+            return False
+
+        if str(target.get("type", "")).casefold() == "password":
+            return False
+
+        if bool(target.get("disabled")):
+            return False
+
+        try:
+            resolved_index = int(state.get("target_index", -1))
+        except (TypeError, ValueError):
+            return False
+
+        if resolved_index < 0:
+            return False
+
+        try:
+            locator = page.locator(_INTERACTIVE_SELECTOR).nth(resolved_index)
+            locator.wait_for(state="visible", timeout=2_500)
+            locator.scroll_into_view_if_needed(timeout=2_500)
+            if not locator.is_editable(timeout=2_500):
+                return False
+            locator.fill(text, timeout=4_000)
+            return True
+        except (PlaywrightError, PlaywrightTimeoutError):
+            return False
+        except Exception:
+            return False
+
+    def select_interactive_option(
+        self,
+        dom_index: int,
+        option: str,
+        *,
+        fingerprint: dict[str, str] | None = None,
+        semantic_kind: str = "",
+    ) -> bool:
+        """Seleciona uma opção de ``<select>`` DOM revalidado.
+
+        A Etapa 12 não simula mouse/teclado. O alvo precisa continuar
+        estruturalmente identificável e ser um ``select`` nativo visível e
+        habilitado. A seleção tenta label e value explicitamente.
+        """
+
+        if not isinstance(dom_index, int) or dom_index < 0 or not option.strip():
+            return False
+
+        page = self._detect_active_page()
+        if page is None:
+            return False
+
+        state = self.inspect_interaction_state(
+            dom_index,
+            fingerprint=fingerprint,
+            semantic_kind=semantic_kind,
+        )
+        if not isinstance(state, dict):
+            return False
+
+        target = state.get("target")
+        if not isinstance(target, dict):
+            return False
+
+        if str(target.get("tag", "")).casefold() != "select":
+            return False
+
+        if bool(target.get("disabled")):
+            return False
+
+        try:
+            resolved_index = int(state.get("target_index", -1))
+        except (TypeError, ValueError):
+            return False
+
+        if resolved_index < 0:
+            return False
+
+        locator = page.locator(_INTERACTIVE_SELECTOR).nth(resolved_index)
+        requested = option.strip()
+
+        try:
+            locator.wait_for(state="visible", timeout=2_500)
+            locator.scroll_into_view_if_needed(timeout=2_500)
+
+            try:
+                selected = locator.select_option(
+                    label=requested,
+                    timeout=3_500,
+                )
+            except (PlaywrightError, PlaywrightTimeoutError):
+                selected = locator.select_option(
+                    value=requested,
+                    timeout=3_500,
+                )
+
+            return bool(selected)
+        except (PlaywrightError, PlaywrightTimeoutError):
+            return False
+        except Exception:
+            return False
+
+    def set_interactive_control_state(
+        self,
+        dom_index: int,
+        desired_state: bool,
+        *,
+        fingerprint: dict[str, str] | None = None,
+        semantic_kind: str = "",
+    ) -> bool:
+        """Altera checkbox/radio/switch por estado estrutural.
+
+        A Etapa 13 usa ``set_checked`` do Playwright. O método recusa controles
+        genéricos, desabilitados e a tentativa de desmarcar radio buttons. Não
+        existe fallback por coordenada, mouse físico ou teclado.
+        """
+
+        if not isinstance(dom_index, int) or dom_index < 0:
+            return False
+
+        page = self._detect_active_page()
+        if page is None:
+            return False
+
+        state = self.inspect_interaction_state(
+            dom_index,
+            fingerprint=fingerprint,
+            semantic_kind=semantic_kind,
+        )
+        if not isinstance(state, dict):
+            return False
+
+        target = state.get("target")
+        if not isinstance(target, dict) or bool(target.get("disabled")):
+            return False
+
+        tag = str(target.get("tag", "")).casefold()
+        role = str(target.get("role", "")).casefold()
+        input_type = str(target.get("type", "")).casefold()
+        is_checkbox = input_type == "checkbox" or role in {"checkbox", "switch"}
+        is_radio = input_type == "radio" or role == "radio"
+
+        if not (is_checkbox or is_radio):
+            return False
+        if is_radio and not desired_state:
+            return False
+        if tag not in {"input", "button", "div", "span"} and not role:
+            return False
+
+        current_state = target.get("checked")
+        if isinstance(current_state, bool) and current_state is desired_state:
+            return True
+
+        try:
+            resolved_index = int(state.get("target_index", -1))
+        except (TypeError, ValueError):
+            return False
+        if resolved_index < 0:
+            return False
+
+        try:
+            locator = page.locator(_INTERACTIVE_SELECTOR).nth(resolved_index)
+            locator.wait_for(state="visible", timeout=2_500)
+            locator.scroll_into_view_if_needed(timeout=2_500)
+            locator.set_checked(desired_state, timeout=4_000)
+            return True
+        except (PlaywrightError, PlaywrightTimeoutError):
+            return False
+        except Exception:
+            return False
+
+    # ==================================================
+    # INTERAÇÃO
+    # ==================================================
     def click_text(self, text: str) -> str:
         text = text.strip()
 
@@ -557,6 +1591,70 @@ class BrowserAutomation:
 
         except Exception as error:
             return f"Erro ao clicar no texto '{text}': {error}"
+
+    def activate_final_control(
+        self,
+        dom_index: int,
+        *,
+        fingerprint: dict[str, str] | None = None,
+        semantic_kind: str = "button",
+    ) -> bool:
+        """Ativa somente um botão final estrutural previamente confirmado.
+
+        O uso é restrito à Etapa 14, depois da confirmação humana de uso único.
+        O alvo é revalidado e precisa continuar sendo um botão de envio.
+        """
+
+        page = self._detect_active_page()
+        if page is None or not isinstance(dom_index, int) or dom_index < 0:
+            return False
+
+        state = self.inspect_interaction_state(
+            dom_index,
+            fingerprint=fingerprint,
+            semantic_kind=semantic_kind,
+        )
+        if not isinstance(state, dict):
+            return False
+
+        target = state.get("target")
+        if not isinstance(target, dict) or bool(target.get("disabled")):
+            return False
+
+        tag = str(target.get("tag", "")).casefold()
+        role = str(target.get("role", "")).casefold()
+        input_type = str(target.get("type", "")).casefold()
+        identity = " ".join(
+            str(target.get(key, "")).casefold()
+            for key in ("text", "aria_label", "name", "title")
+        )
+        final_terms = {"enviar", "submit", "confirmar"}
+        is_button = (
+            tag == "button"
+            or role == "button"
+            or (tag == "input" and input_type in {"button", "submit"})
+        )
+        if not is_button or not any(term in identity for term in final_terms):
+            return False
+
+        try:
+            resolved_index = int(state.get("target_index", -1))
+        except (TypeError, ValueError):
+            return False
+        if resolved_index < 0:
+            return False
+
+        try:
+            locator = page.locator(_INTERACTIVE_SELECTOR).nth(resolved_index)
+            locator.wait_for(state="visible", timeout=2_500)
+            locator.scroll_into_view_if_needed(timeout=2_500)
+            locator.click(timeout=2_500, trial=True)
+            locator.click(timeout=4_000)
+            return True
+        except (PlaywrightError, PlaywrightTimeoutError):
+            return False
+        except Exception:
+            return False
 
     def fill_input(
         self,

@@ -141,6 +141,63 @@ da execução. O executor opera em dry-run por padrão, usa `shell=False`, escop
 do usuário e remove somente pastas vazias criadas por ele quando uma etapa
 posterior falha.
 
+## Atlas Edge
+
+O `ITProvisioningAgent` é a camada local da Sprint 23 para computadores
+corporativos. A Etapa 1 mantém identidade aleatória, estado persistente,
+cadastro supervisionado, inventário sanitizado e heartbeat local. A Etapa 2
+adiciona um catálogo fechado de perfis e autorização de planos:
+
+```mermaid
+flowchart TD
+    TI[Responsável de TI] --> A[Cadastro temporário]
+    A --> R[Revalidação do inventário]
+    R --> E[Atlas Edge cadastrado]
+    E --> H[Heartbeat local sanitizado]
+    E --> P[Perfil autorizado pela TI]
+    P --> V[Plano revisável]
+    V --> C[Aprovação separada]
+```
+
+O estado fica em `data/edge/device.json`. Token e identidade do aprovador não
+são persistidos; apenas o hash do responsável é guardado como evidência. O
+agente não possui transporte remoto nesta sprint. Programas usam IDs exatos do
+WinGet e pastas são relativas ao workspace corporativo. A referência do
+funcionário e as identidades de quem solicita e aprova são convertidas em
+SHA-256; o solicitante não pode aprovar o próprio plano. Perfil, vínculo e
+inventário são revalidados antes da autorização.
+
+A autorização da Etapa 2 é um recibo de curta duração. Na Etapa 3, esse recibo
+é consumido uma única vez pela `EdgeTaskQueue`, persistida em
+`data/edge/tasks.json`. Uma tarefa marcada como `running` durante uma interrupção
+retorna a `queued` no reinício, com contador de recuperação e sem repetir uma
+ação antes de revalidar o inventário.
+
+Antes da execução, `EdgeExecutionService` recarrega o perfil oficial, compara
+seu digest, captura novamente o inventário e reconstrói todas as etapas. Essa
+comparação impede que uma edição manual do arquivo da fila adicione pacotes ou
+configurações. A execução é sempre iniciada para um `task_id` explícito.
+
+Os contratos da Etapa 3 cobrem programas, pastas, navegador, impressoras, VPN e
+rede. Configurações específicas da empresa passam por
+`ManagedSettingsAdapter`; o adaptador padrão bloqueia execução real. O modo
+real também exige simultaneamente `ATLAS_EDGE_EXECUTION_ENABLED=1` e
+`ATLAS_PROVISIONING_DRY_RUN=0`. A configuração padrão continua simulada.
+
+Na Etapa 4, `GovernedEdgeService` coloca o `EdgePolicyEngine` antes de todas as
+operações. Funções separadas de operador, aprovador, executor, auditor e
+administrador são combinadas com allowlists exatas e isolamento por
+organização. A auditoria fica em `data/edge/audit.db`, guarda somente hashes e
+IDs seguros e possui retenção e quantidade limitadas.
+
+A Etapa 5 fecha a Sprint 23 com `EmployeeOnboardingService`. Cada configuração
+de novo funcionário passa a ser um workflow persistente em
+`data/edge/onboardings.json`: plano, aprovação, fila, execução, cancelamento,
+reconciliação após reinício e relatório operacional. Tokens de plano e recibos
+de autorização permanecem somente em memória. Se o processo reiniciar antes da
+fila, o onboarding exige novo plano; após entrar na fila, o `task_id` persistido
+permite retomar com as revalidações da Etapa 3.
+
 ## Voz 2.0
 
 `VoiceSession` continua sendo a fonte única de verdade para escuta,
