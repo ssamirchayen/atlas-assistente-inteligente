@@ -27,6 +27,7 @@ from atlas.core.config import (
     VOICE_ENABLED,
 )
 from atlas.voice.latency import VoiceLatencyTracker
+from atlas.voice.playback import AudioPlaybackError, WindowsMciPlayer
 from atlas.voice.profile import (
     VoicePerformanceProfile,
     resolve_voice_profile,
@@ -97,6 +98,7 @@ class SpeechInterface:
         self._microphone_lock = Lock()
         self._speech_process_lock = Lock()
         self._speech_process: subprocess.Popen[bytes] | None = None
+        self._neural_player = WindowsMciPlayer()
         provider_name = str(tts_provider or TTS_PROVIDER).strip().lower()
         self.tts_provider = (
             provider_name if provider_name in {"edge", "windows"} else "edge"
@@ -117,6 +119,33 @@ class SpeechInterface:
             else None
         )
         self.tts_chunk_max_chars = TTS_CHUNK_MAX_CHARS
+
+    @classmethod
+    def runtime_self_test(cls) -> bool:
+        """Valida dependências essenciais sem acessar microfone ou rede."""
+
+        try:
+            import edge_tts
+
+            from atlas.voice.continuous import ContinuousVoiceListener
+            from atlas.voice.interruption import VoiceInterruptionMonitor
+            from atlas.voice.session import VoiceSession
+
+            required = (
+                ContinuousVoiceListener,
+                VoiceInterruptionMonitor,
+                VoiceSession,
+            )
+            return (
+                edge_tts is not None
+                and all(item is not None for item in required)
+                and EdgeTTSProvider.dependency_available()
+                and callable(getattr(EdgeTTSProvider, "synthesize", None))
+                and callable(getattr(WindowsMciPlayer, "play", None))
+                and callable(getattr(WindowsMciPlayer, "stop", None))
+            )
+        except ImportError:
+            return False
 
     def performance_snapshot(self) -> dict[str, object]:
         """Retorna configuração e métricas sem conteúdo de fala."""
@@ -258,26 +287,14 @@ class SpeechInterface:
         temporary.close()
 
         try:
-            completed = subprocess.run(
-                self.neural_voice.synthesis_command(
-                    message,
-                    media_path,
-                ),
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+            self.neural_voice.synthesize(
+                message,
+                media_path,
                 timeout=30,
-                creationflags=getattr(
-                    subprocess,
-                    "CREATE_NO_WINDOW",
-                    0,
-                ),
-                check=False,
             )
 
             if (
-                completed.returncode != 0
-                or not media_path.is_file()
+                not media_path.is_file()
                 or media_path.stat().st_size == 0
             ):
                 media_path.unlink(missing_ok=True)
@@ -304,23 +321,24 @@ class SpeechInterface:
                 temporary=True,
             )
 
-        except (OSError, subprocess.TimeoutExpired):
+        except Exception as exc:
             media_path.unlink(missing_ok=True)
+            print(f"[AVISO] Falha na síntese neural: {exc}")
             return None
 
     def _play_prepared_chunk(
         self,
         prepared: _PreparedVoiceChunk,
     ) -> bool:
-        playback_result = self._run_speech_process(
-            self.neural_voice.playback_command(prepared.path),
-            timeout=120,
-        )
+        if self.session.interruption_requested():
+            return True
 
-        return (
-            playback_result == 0
-            or self.session.interruption_requested()
-        )
+        try:
+            self._neural_player.play(prepared.path)
+        except (AudioPlaybackError, OSError):
+            return self.session.interruption_requested()
+
+        return True
 
     @staticmethod
     def _cleanup_prepared_chunk(
@@ -617,8 +635,9 @@ class SpeechInterface:
         except VoiceTransitionError:
             changed = False
 
+        neural_stopped = self._neural_player.stop()
         speech_stopped = self._terminate_speech_process()
-        return changed or speech_stopped
+        return changed or neural_stopped or speech_stopped
 
     def _terminate_speech_process(self) -> bool:
         with self._speech_process_lock:

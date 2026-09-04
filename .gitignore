@@ -35,3 +35,13 @@ ruff_erros.txt
 .idea/
 .DS_Store
 Thumbs.db
+build/
+dist/
+data/
+logs/
+*.db
+*.sqlite
+*.sqlite3
+*.pfx
+*.p12
+*.key

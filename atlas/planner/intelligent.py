@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from typing import Any, Protocol
 
-from atlas.brain.ollama import OllamaBrain
 from atlas.context.manager import ContextManager
 from atlas.planner.actions import Action
 from atlas.planner.safety import SafetyGuard
 from atlas.planner.task_planner import TaskPlanner
 from atlas.planner.tools import ToolRegistry
+
+
+class BrainResponder(Protocol):
+    def respond(self, user_text: str, memory_context: str = "") -> str: ...
 
 
 class IntelligentPlanner:
@@ -23,17 +26,21 @@ class IntelligentPlanner:
     def __init__(
         self,
         context: ContextManager,
-        brain: OllamaBrain | None = None,
+        brain: BrainResponder | None = None,
         tools: ToolRegistry | None = None,
         safety: SafetyGuard | None = None,
         task_planner: TaskPlanner | None = None,
     ) -> None:
         self.context = context
-        self.brain = brain or OllamaBrain(context)
+        if brain is None:
+            from atlas.brain.ollama import OllamaBrain
+
+            brain = OllamaBrain(context)
+        self.brain = brain
         self.tools = tools or ToolRegistry()
         self.safety = safety or SafetyGuard(self.tools)
         self.task_planner = task_planner or TaskPlanner()
-       
+
     def plan(
         self,
         user_text: str,

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import base64
+import importlib.util
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,6 +27,46 @@ class EdgeTTSProvider:
             volume=self.volume,
             pitch=self.pitch,
         )
+
+    @staticmethod
+    def dependency_available() -> bool:
+        """Retorna True quando o pacote Python ``edge_tts`` está disponível."""
+
+        return importlib.util.find_spec("edge_tts") is not None
+
+    def synthesize(
+        self,
+        message: str,
+        media_path: Path,
+        *,
+        timeout: float = 30.0,
+    ) -> None:
+        """Gera o MP3 pela API Python do Edge TTS.
+
+        Esta rota é segura para builds congeladas pelo PyInstaller. Em um
+        executável congelado, ``sys.executable`` aponta para ``Atlas.exe`` e
+        não pode ser usado como se fosse ``python.exe -m edge_tts``.
+        """
+
+        if timeout <= 0:
+            raise ValueError("O timeout da síntese deve ser maior que zero.")
+
+        async def _save() -> None:
+            import edge_tts
+
+            communicator = edge_tts.Communicate(
+                message,
+                voice=self.voice,
+                rate=self.rate,
+                volume=self.volume,
+                pitch=self.pitch,
+            )
+            await asyncio.wait_for(
+                communicator.save(str(media_path)),
+                timeout=timeout,
+            )
+
+        asyncio.run(_save())
 
     def synthesis_command(
         self,

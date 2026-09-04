@@ -1,0 +1,958 @@
+"""Catálogo inicial dos fluxos de dados existentes no Atlas."""
+
+from __future__ import annotations
+
+from atlas.privacy.inventory import ProcessingInventory
+from atlas.privacy.models import (
+    DataCategory,
+    DataNature,
+    DataStore,
+    DataSubject,
+    LegalBasisStatus,
+    ProcessingOperation,
+    ProcessingRecord,
+    RetentionMode,
+    RetentionPolicy,
+    StorageKind,
+)
+
+
+_PENDING = LegalBasisStatus.REQUIRES_CONTROLLER_DEFINITION
+_LOCAL_RUNTIME = ("Usuário autorizado", "Componentes locais do Atlas")
+_BASE_REQUIRED = ("purpose_binding", "data_subject_rights")
+
+
+def _store(
+    location: str,
+    kind: StorageKind,
+    provider: str = "Atlas local",
+    *,
+    local: bool = True,
+    encrypted: bool | None = False,
+    ephemeral: bool = False,
+) -> DataStore:
+    return DataStore(
+        location=location,
+        kind=kind,
+        provider=provider,
+        local=local,
+        encrypted_at_rest=encrypted,
+        ephemeral=ephemeral,
+    )
+
+
+def _retention(
+    mode: RetentionMode,
+    description: str,
+    key: str | None = None,
+) -> RetentionPolicy:
+    return RetentionPolicy(
+        mode=mode,
+        description=description,
+        configuration_key=key,
+    )
+
+
+def build_default_privacy_inventory() -> ProcessingInventory:
+    """Mapeia os fluxos atuais sem afirmar decisões jurídicas da empresa."""
+
+    records = (
+        ProcessingRecord(
+            record_id="core.conversation_context",
+            name="Contexto recente de conversa",
+            component="atlas.context.manager.ContextManager",
+            nature=DataNature.SENSITIVE_PERSONAL,
+            categories=(
+                DataCategory.CONVERSATION,
+                DataCategory.PREFERENCES,
+                DataCategory.HEALTH,
+                DataCategory.PROFESSIONAL,
+                DataCategory.EDUCATIONAL,
+                DataCategory.FINANCIAL,
+            ),
+            subjects=(
+                DataSubject.USER,
+                DataSubject.EMPLOYEE,
+                DataSubject.CUSTOMER,
+                DataSubject.PATIENT,
+                DataSubject.CHILD_OR_ADOLESCENT,
+                DataSubject.THIRD_PARTY,
+            ),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.USE,
+                ProcessingOperation.DELETE,
+            ),
+            purpose="Manter o contexto recente necessário para responder.",
+            source="Mensagens digitadas ou transcritas do usuário.",
+            recipients=_LOCAL_RUNTIME,
+            stores=(
+                _store(
+                    "Memória volátil do processo (até 10 turnos)",
+                    StorageKind.VOLATILE_MEMORY,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+            ),
+            retention=_retention(
+                RetentionMode.BOUNDED_BY_COUNT,
+                "Até 10 turnos ou encerramento do processo.",
+            ),
+            controller_role="Organização que opera o Atlas",
+            operator_roles=("Operador local autorizado",),
+            legal_basis_status=_PENDING,
+            implemented_controls=("bounded_context", "manual_clear"),
+            required_controls=_BASE_REQUIRED + ("sensitive_input_guard",),
+            notes="O contexto pode conter dados sensíveis informados livremente.",
+        ),
+        ProcessingRecord(
+            record_id="memory.long_term_and_embeddings",
+            name="Memória persistente e embeddings",
+            component="atlas.memory.database.MemoryStore",
+            nature=DataNature.SENSITIVE_PERSONAL,
+            categories=(
+                DataCategory.CONVERSATION,
+                DataCategory.PREFERENCES,
+                DataCategory.HEALTH,
+                DataCategory.PROFESSIONAL,
+                DataCategory.EDUCATIONAL,
+            ),
+            subjects=(DataSubject.USER, DataSubject.THIRD_PARTY),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.CLASSIFY,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.DELETE,
+            ),
+            purpose="Recordar fatos autorizados e recuperar contexto relevante.",
+            source="Usuário e captura automática com confiança mínima.",
+            recipients=_LOCAL_RUNTIME + ("Ollama local para embeddings",),
+            stores=(
+                _store("data/memory.db", StorageKind.SQLITE),
+                _store("data/memory.db:memory_embeddings", StorageKind.SQLITE),
+            ),
+            retention=_retention(
+                RetentionMode.UNDEFINED,
+                "Decay reduz prioridade, mas ainda não elimina por prazo.",
+            ),
+            controller_role="Organização que opera o Atlas",
+            operator_roles=("Usuário autorizado", "Administrador do Atlas"),
+            legal_basis_status=_PENDING,
+            implemented_controls=(
+                "sensitive_auto_memory_off",
+                "manual_deactivation",
+                "local_embeddings",
+            ),
+            required_controls=_BASE_REQUIRED
+            + ("at_rest_encryption", "retention_schedule"),
+        ),
+        ProcessingRecord(
+            record_id="session.operational_history",
+            name="Sessões, timeline e continuidade operacional",
+            component="atlas.session.storage.SqliteSessionStore",
+            nature=DataNature.PERSONAL,
+            categories=(
+                DataCategory.IDENTIFICATION,
+                DataCategory.CONVERSATION,
+                DataCategory.OPERATIONAL_AUDIT,
+            ),
+            subjects=(DataSubject.USER, DataSubject.OPERATOR),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.USE,
+            ),
+            purpose="Retomar tarefas e comprovar a sequência operacional.",
+            source="Controller, workflows e comandos do Atlas.",
+            recipients=_LOCAL_RUNTIME + ("API local autenticada",),
+            stores=(
+                _store("data/operational_sessions.db", StorageKind.SQLITE),
+                _store("data/last_session.json", StorageKind.JSON),
+            ),
+            retention=_retention(
+                RetentionMode.UNDEFINED,
+                "Nenhum prazo automático foi implementado nesta versão.",
+            ),
+            controller_role="Organização que opera o Atlas",
+            operator_roles=("Usuário autorizado", "Administrador do Atlas"),
+            legal_basis_status=_PENDING,
+            implemented_controls=("local_api_only", "structured_timeline"),
+            required_controls=_BASE_REQUIRED
+            + ("at_rest_encryption", "retention_schedule"),
+        ),
+        ProcessingRecord(
+            record_id="api.security_audit",
+            name="Auditoria da API local",
+            component="atlas.api.audit.SqliteAuditStore",
+            nature=DataNature.PERSONAL,
+            categories=(
+                DataCategory.IDENTIFICATION,
+                DataCategory.AUTHENTICATION,
+                DataCategory.OPERATIONAL_AUDIT,
+            ),
+            subjects=(DataSubject.USER, DataSubject.OPERATOR),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.PSEUDONYMIZE,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.DELETE,
+            ),
+            purpose="Segurança, rastreabilidade e diagnóstico da API local.",
+            source="Requisições autenticadas recebidas pela API.",
+            recipients=("Administrador do Atlas", "API local autenticada"),
+            stores=(_store("data/api_audit.db", StorageKind.SQLITE),),
+            retention=_retention(
+                RetentionMode.CONFIGURED,
+                "Padrão de 90 dias, também limitado a 10.000 eventos.",
+                "ATLAS_API_AUDIT_RETENTION_DAYS",
+            ),
+            controller_role="Organização que opera o Atlas",
+            operator_roles=("Administrador do Atlas",),
+            legal_basis_status=_PENDING,
+            implemented_controls=(
+                "sensitive_field_redaction",
+                "bounded_retention",
+                "local_api_only",
+            ),
+            required_controls=_BASE_REQUIRED + ("at_rest_encryption",),
+        ),
+        ProcessingRecord(
+            record_id="voice.speech_recognition",
+            name="Reconhecimento de voz",
+            component="atlas.voice.speech.SpeechInterface.listen",
+            nature=DataNature.SENSITIVE_PERSONAL,
+            categories=(DataCategory.VOICE_AUDIO, DataCategory.CONVERSATION),
+            subjects=(DataSubject.USER, DataSubject.THIRD_PARTY),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.TRANSMIT,
+                ProcessingOperation.USE,
+            ),
+            purpose="Converter um comando falado em texto para o Atlas.",
+            source="Microfone selecionado pelo sistema operacional.",
+            recipients=(
+                "Google Speech Recognition",
+                "Componentes locais do Atlas",
+            ),
+            stores=(
+                _store(
+                    "Áudio transitório da captura",
+                    StorageKind.VOLATILE_MEMORY,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+                _store(
+                    "Google Speech Recognition (rede)",
+                    StorageKind.REMOTE_SERVICE,
+                    "Google",
+                    local=False,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+            ),
+            retention=_retention(
+                RetentionMode.EXTERNAL_POLICY,
+                "O Atlas não persiste o áudio; a política externa deve ser validada.",
+            ),
+            controller_role="Organização que ativa o microfone",
+            operator_roles=("Google como provedor externo a avaliar",),
+            legal_basis_status=_PENDING,
+            international_transfer=True,
+            implemented_controls=("microphone_toggle", "no_local_audio_archive"),
+            required_controls=_BASE_REQUIRED
+            + ("provider_assessment", "transfer_mechanism"),
+        ),
+        ProcessingRecord(
+            record_id="voice.neural_tts_and_cache",
+            name="Síntese neural e cache de fala",
+            component="atlas.voice.speech e atlas.voice.tts_cache",
+            nature=DataNature.PERSONAL,
+            categories=(DataCategory.CONVERSATION, DataCategory.VOICE_AUDIO),
+            subjects=(DataSubject.USER, DataSubject.THIRD_PARTY),
+            operations=(
+                ProcessingOperation.USE,
+                ProcessingOperation.TRANSMIT,
+                ProcessingOperation.STORE,
+                ProcessingOperation.DELETE,
+            ),
+            purpose="Transformar respostas do Atlas em áudio com baixa latência.",
+            source="Texto de resposta produzido pelo Atlas.",
+            recipients=("Microsoft Edge TTS", "Usuário local"),
+            stores=(
+                _store(
+                    "Microsoft Edge TTS (rede)",
+                    StorageKind.REMOTE_SERVICE,
+                    "Microsoft",
+                    local=False,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+                _store("data/voice_cache/*.mp3", StorageKind.MEDIA_FILE),
+            ),
+            retention=_retention(
+                RetentionMode.BOUNDED_BY_COUNT,
+                "Cache LRU limitado, padrão de 64 arquivos.",
+            ),
+            controller_role="Organização que ativa a voz neural",
+            operator_roles=("Microsoft como provedor externo a avaliar",),
+            legal_basis_status=_PENDING,
+            international_transfer=True,
+            implemented_controls=("hashed_cache_key", "bounded_cache", "manual_clear"),
+            required_controls=_BASE_REQUIRED
+            + ("provider_assessment", "transfer_mechanism"),
+        ),
+        ProcessingRecord(
+            record_id="vision.screen_capture",
+            name="Capturas e análise da tela",
+            component="atlas.vision.service.VisionService",
+            nature=DataNature.SENSITIVE_PERSONAL,
+            categories=(
+                DataCategory.SCREEN_IMAGE,
+                DataCategory.IDENTIFICATION,
+                DataCategory.HEALTH,
+                DataCategory.FINANCIAL,
+                DataCategory.AUTHENTICATION,
+            ),
+            subjects=(
+                DataSubject.USER,
+                DataSubject.EMPLOYEE,
+                DataSubject.CUSTOMER,
+                DataSubject.PATIENT,
+                DataSubject.CHILD_OR_ADOLESCENT,
+                DataSubject.THIRD_PARTY,
+            ),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.USE,
+                ProcessingOperation.DELETE,
+            ),
+            purpose="Compreender a interface e localizar elementos solicitados.",
+            source="Tela principal do computador local.",
+            recipients=("Ollama Vision local", "Usuário autorizado"),
+            stores=(
+                _store(
+                    "data/vision/screen_*.png",
+                    StorageKind.MEDIA_FILE,
+                    ephemeral=True,
+                ),
+            ),
+            retention=_retention(
+                RetentionMode.CONFIGURED,
+                "Exclusão após análise por padrão; retenção exige ativação explícita.",
+                "ATLAS_VISION_KEEP_CAPTURES",
+            ),
+            controller_role="Organização que ativa o Atlas Vision",
+            operator_roles=("Usuário autorizado",),
+            legal_basis_status=_PENDING,
+            implemented_controls=(
+                "transient_by_default",
+                "local_inference",
+                "credential_action_block",
+            ),
+            required_controls=_BASE_REQUIRED
+            + ("screen_privacy_filter", "sensitive_input_guard"),
+        ),
+        ProcessingRecord(
+            record_id="internet.search_queries",
+            name="Consultas e resultados de pesquisa web",
+            component="atlas.internet.service.InternetSearchService",
+            nature=DataNature.PERSONAL,
+            categories=(
+                DataCategory.INTERNET_ACTIVITY,
+                DataCategory.CONVERSATION,
+            ),
+            subjects=(DataSubject.USER, DataSubject.THIRD_PARTY),
+            operations=(
+                ProcessingOperation.USE,
+                ProcessingOperation.TRANSMIT,
+                ProcessingOperation.ACCESS,
+            ),
+            purpose="Pesquisar fontes web solicitadas e devolver referências.",
+            source="Consulta informada pelo usuário.",
+            recipients=("Wikipédia", "Brave opcional", "SearXNG opcional"),
+            stores=(
+                _store(
+                    "Provedores de pesquisa configurados (rede)",
+                    StorageKind.REMOTE_SERVICE,
+                    "Provedores web",
+                    local=False,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+            ),
+            retention=_retention(
+                RetentionMode.EXTERNAL_POLICY,
+                "Sem persistência própria; políticas dos provedores devem ser avaliadas.",
+            ),
+            controller_role="Organização que habilita pesquisa web",
+            operator_roles=("Provedores de pesquisa a avaliar",),
+            legal_basis_status=_PENDING,
+            international_transfer=True,
+            implemented_controls=("safe_url_validation", "rate_limit"),
+            required_controls=_BASE_REQUIRED
+            + ("provider_assessment", "transfer_mechanism"),
+        ),
+        ProcessingRecord(
+            record_id="school.crm_leads",
+            name="Leads escolares, opt-in e atribuição",
+            component="atlas.school.crm.SchoolCRM",
+            nature=DataNature.PERSONAL,
+            categories=(
+                DataCategory.IDENTIFICATION,
+                DataCategory.CONTACT,
+                DataCategory.EDUCATIONAL,
+                DataCategory.OPERATIONAL_AUDIT,
+            ),
+            subjects=(
+                DataSubject.LEAD,
+                DataSubject.SELLER,
+                DataSubject.CHILD_OR_ADOLESCENT,
+            ),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.USE,
+                ProcessingOperation.STORE,
+                ProcessingOperation.SHARE,
+            ),
+            purpose="Distribuir leads autorizados e registrar o atendimento.",
+            source="CRM escolar integrado pela organização.",
+            recipients=("Vendedor responsável", "CRM escolar", "Meta WhatsApp"),
+            stores=(
+                _store(
+                    "CRM escolar definido pela empresa",
+                    StorageKind.REMOTE_SERVICE,
+                    "CRM da organização",
+                    local=False,
+                    encrypted=None,
+                ),
+                _store(
+                    "Filas pendentes em memória",
+                    StorageKind.VOLATILE_MEMORY,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+            ),
+            retention=_retention(
+                RetentionMode.EXTERNAL_POLICY,
+                "Deve seguir a política documentada do CRM da escola.",
+            ),
+            controller_role="Escola ou organização responsável pelos leads",
+            operator_roles=("Atlas", "Fornecedor do CRM", "Meta"),
+            legal_basis_status=_PENDING,
+            international_transfer=True,
+            implemented_controls=(
+                "verified_opt_in",
+                "masked_phone",
+                "destination_hash",
+                "human_confirmation",
+                "dry_run_default",
+            ),
+            required_controls=_BASE_REQUIRED
+            + (
+                "child_safeguards",
+                "provider_assessment",
+                "transfer_mechanism",
+            ),
+        ),
+        ProcessingRecord(
+            record_id="edge.device_and_employee_onboarding",
+            name="Dispositivo e onboarding de funcionário",
+            component="atlas.edge e atlas.provisioning",
+            nature=DataNature.PERSONAL,
+            categories=(
+                DataCategory.IDENTIFICATION,
+                DataCategory.PROFESSIONAL,
+                DataCategory.DEVICE_TECHNICAL,
+                DataCategory.OPERATIONAL_AUDIT,
+            ),
+            subjects=(DataSubject.EMPLOYEE, DataSubject.OPERATOR),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.USE,
+                ProcessingOperation.PSEUDONYMIZE,
+            ),
+            purpose="Configurar um computador conforme perfil aprovado de trabalho.",
+            source="Inventário local, catálogo de perfis e solicitações da TI.",
+            recipients=("Equipe de TI autorizada", "Atlas Edge local"),
+            stores=(
+                _store("data/edge/device.json", StorageKind.JSON),
+                _store("data/edge/tasks.json", StorageKind.JSON),
+                _store("data/edge/onboardings.json", StorageKind.JSON),
+                _store("data/edge/audit.db", StorageKind.SQLITE),
+            ),
+            retention=_retention(
+                RetentionMode.UNDEFINED,
+                "Auditoria tem limite configurável; demais estados não têm prazo.",
+            ),
+            controller_role="Empresa empregadora que administra os dispositivos",
+            operator_roles=("Equipe de TI", "Administrador do Atlas"),
+            legal_basis_status=_PENDING,
+            automated_decision=True,
+            implemented_controls=(
+                "tenant_isolation",
+                "role_based_access",
+                "hashed_actor",
+                "human_confirmation",
+                "dry_run_default",
+                "bounded_audit",
+            ),
+            required_controls=_BASE_REQUIRED
+            + ("at_rest_encryption", "retention_schedule"),
+        ),
+        ProcessingRecord(
+            record_id="privacy.policy_decision_audit",
+            name="Decisões do motor de políticas de privacidade",
+            component="atlas.privacy.policy e atlas.privacy.audit",
+            nature=DataNature.PERSONAL,
+            categories=(
+                DataCategory.IDENTIFICATION,
+                DataCategory.OPERATIONAL_AUDIT,
+            ),
+            subjects=(DataSubject.OPERATOR, DataSubject.USER),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.PSEUDONYMIZE,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+            ),
+            purpose="Comprovar autorizações e bloqueios de tratamentos de dados.",
+            source="PrivacyPolicyEngine, sem payload ou identificador bruto.",
+            recipients=("Administrador de privacidade autorizado",),
+            stores=(
+                _store(
+                    "Memória volátil limitada a 1.000 eventos por padrão",
+                    StorageKind.VOLATILE_MEMORY,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+            ),
+            retention=_retention(
+                RetentionMode.BOUNDED_BY_COUNT,
+                "Fila em memória limitada; o padrão mantém até 1.000 eventos.",
+            ),
+            controller_role="Organização que define as políticas de tratamento",
+            operator_roles=("Administrador de privacidade",),
+            legal_basis_status=_PENDING,
+            implemented_controls=(
+                "purpose_binding",
+                "tenant_isolation",
+                "role_based_access",
+                "hmac_pseudonymization",
+                "metadata_only",
+                "bounded_retention",
+                "sensitive_default_deny",
+                "consent_revocation",
+                "data_minimization",
+                "data_subject_rights",
+            ),
+            required_controls=(
+                "persistent_audit_policy",
+            ),
+        ),
+        ProcessingRecord(
+            record_id="privacy.subject_rights_requests",
+            name="Solicitações de direitos dos titulares",
+            component="atlas.privacy.rights e atlas.privacy.subject_data",
+            nature=DataNature.PERSONAL,
+            categories=(
+                DataCategory.IDENTIFICATION,
+                DataCategory.OPERATIONAL_AUDIT,
+            ),
+            subjects=(
+                DataSubject.USER,
+                DataSubject.EMPLOYEE,
+                DataSubject.LEAD,
+                DataSubject.CUSTOMER,
+                DataSubject.PATIENT,
+                DataSubject.CHILD_OR_ADOLESCENT,
+                DataSubject.THIRD_PARTY,
+            ),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.PSEUDONYMIZE,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.USE,
+                ProcessingOperation.DELETE,
+            ),
+            purpose="Receber, verificar, revisar e executar direitos do titular.",
+            source="Titular ou representante, com verificação fora da auditoria.",
+            recipients=(
+                "Encarregado ou equipe de privacidade autorizada",
+                "Titular verificado por canal seguro",
+            ),
+            stores=(
+                _store(
+                    "Memória volátil limitada a 1.000 solicitações por padrão",
+                    StorageKind.VOLATILE_MEMORY,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+            ),
+            retention=_retention(
+                RetentionMode.BOUNDED_BY_COUNT,
+                "Até 1.000 solicitações; terminais são as primeiras a sair.",
+            ),
+            controller_role="Organização responsável pelo atendimento do titular",
+            operator_roles=("Encarregado", "Equipe de privacidade"),
+            legal_basis_status=_PENDING,
+            implemented_controls=(
+                "identity_challenge",
+                "challenge_attempt_limit",
+                "tenant_isolation",
+                "role_based_access",
+                "policy_engine_authorization",
+                "two_person_approval",
+                "dry_run_default",
+                "metadata_only",
+                "bounded_retention",
+                "no_payload_persistence",
+            ),
+            required_controls=(
+                "encrypted_request_store",
+                "retention_schedule",
+                "secure_delivery_channel",
+                "shared_processor_notification",
+            ),
+            notes=(
+                "Nenhuma fonte real é conectada automaticamente; mutações ficam "
+                "desativadas por padrão."
+            ),
+        ),
+        ProcessingRecord(
+            record_id="privacy.retention_disposal_actions",
+            name="Decisões de retenção e comprovantes de descarte",
+            component="atlas.privacy.retention e atlas.privacy.disposal",
+            nature=DataNature.PERSONAL,
+            categories=(
+                DataCategory.IDENTIFICATION,
+                DataCategory.OPERATIONAL_AUDIT,
+            ),
+            subjects=(
+                DataSubject.USER,
+                DataSubject.EMPLOYEE,
+                DataSubject.LEAD,
+                DataSubject.CUSTOMER,
+                DataSubject.PATIENT,
+                DataSubject.CHILD_OR_ADOLESCENT,
+                DataSubject.THIRD_PARTY,
+            ),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.PSEUDONYMIZE,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.DELETE,
+            ),
+            purpose=(
+                "Aplicar prazos, impedir descarte indevido e comprovar exclusões "
+                "lógicas autorizadas."
+            ),
+            source=(
+                "Regras aprovadas, candidatos pseudonimizados e adaptadores "
+                "de dados declarados."
+            ),
+            recipients=(
+                "Encarregado ou equipe de privacidade autorizada",
+                "Operadores que devam receber tarefa de comunicação",
+            ),
+            stores=(
+                _store(
+                    "Memória volátil limitada a 1.000 eventos por padrão",
+                    StorageKind.VOLATILE_MEMORY,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+            ),
+            retention=_retention(
+                RetentionMode.BOUNDED_BY_COUNT,
+                "Trilhas em memória limitadas a 1.000 eventos por padrão.",
+            ),
+            controller_role="Organização que aprova os prazos de retenção",
+            operator_roles=("Encarregado", "Equipe de privacidade"),
+            legal_basis_status=_PENDING,
+            implemented_controls=(
+                "versioned_retention_policy",
+                "mandatory_policy_approval",
+                "bounded_legal_hold",
+                "grace_period",
+                "two_person_approval",
+                "pre_execution_revalidation",
+                "idempotent_disposal",
+                "dry_run_default",
+                "metadata_only_receipt",
+                "processor_notification_queue",
+            ),
+            required_controls=(
+                "persistent_encrypted_receipt_store",
+                "production_source_adapters",
+                "processor_notification_delivery",
+                "physical_media_sanitization_procedure",
+            ),
+            notes=(
+                "O comprovante atesta a ação lógica do adaptador, não a "
+                "sanitização física de mídia ou backups externos."
+            ),
+        ),
+        ProcessingRecord(
+            record_id="privacy.incident_response_records",
+            name="Registro e resposta a incidentes com dados pessoais",
+            component="atlas.privacy.incidents",
+            nature=DataNature.PERSONAL,
+            categories=(
+                DataCategory.IDENTIFICATION,
+                DataCategory.OPERATIONAL_AUDIT,
+            ),
+            subjects=(
+                DataSubject.USER,
+                DataSubject.EMPLOYEE,
+                DataSubject.LEAD,
+                DataSubject.CUSTOMER,
+                DataSubject.PATIENT,
+                DataSubject.CHILD_OR_ADOLESCENT,
+                DataSubject.THIRD_PARTY,
+            ),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.PSEUDONYMIZE,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.USE,
+            ),
+            purpose=(
+                "Registrar, avaliar e coordenar a resposta supervisionada a "
+                "incidentes de segurança."
+            ),
+            source="Equipe de resposta, operadores e inventário de tratamentos.",
+            recipients=(
+                "Controlador e encarregado autorizados",
+                "ANPD e titulares somente após decisão humana",
+            ),
+            stores=(
+                _store(
+                    "Memória volátil limitada a 1.000 incidentes por padrão",
+                    StorageKind.VOLATILE_MEMORY,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+            ),
+            retention=_retention(
+                RetentionMode.BOUNDED_BY_COUNT,
+                "Até 1.000 incidentes; persistência depende da política externa.",
+            ),
+            controller_role="Organização que determina a comunicação do incidente",
+            operator_roles=("Encarregado", "Equipe de resposta a incidentes"),
+            legal_basis_status=_PENDING,
+            implemented_controls=(
+                "metadata_only",
+                "tenant_isolation",
+                "business_day_deadline",
+                "conservative_risk_triage",
+                "two_person_approval",
+                "manual_submission_only",
+                "bounded_retention",
+            ),
+            required_controls=(
+                "persistent_encrypted_incident_store",
+                "official_holiday_calendar",
+                "anpd_submission_procedure",
+                "subject_notification_delivery",
+                "incident_response_runbook",
+            ),
+            notes=(
+                "O cálculo considera segunda a sexta; feriados e regras setoriais "
+                "devem ser aplicados pela organização."
+            ),
+        ),
+        ProcessingRecord(
+            record_id="privacy.impact_assessments",
+            name="Relatórios de impacto à proteção de dados pessoais",
+            component="atlas.privacy.impact",
+            nature=DataNature.PERSONAL,
+            categories=(DataCategory.OPERATIONAL_AUDIT,),
+            subjects=(DataSubject.OPERATOR,),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.PSEUDONYMIZE,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.USE,
+            ),
+            purpose=(
+                "Estruturar riscos, salvaguardas e aprovações humanas de RIPD."
+            ),
+            source="Inventário de tratamentos e avaliação aprovada pelo controlador.",
+            recipients=("Controlador", "Encarregado e revisores autorizados"),
+            stores=(
+                _store(
+                    "Memória volátil do serviço de RIPD",
+                    StorageKind.VOLATILE_MEMORY,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+            ),
+            retention=_retention(
+                RetentionMode.EXTERNAL_POLICY,
+                "Definida pela política documental aprovada pelo controlador.",
+            ),
+            controller_role="Organização responsável pelo tratamento avaliado",
+            operator_roles=("Encarregado", "Equipe de privacidade"),
+            legal_basis_status=_PENDING,
+            implemented_controls=(
+                "inventory_snapshot_digest",
+                "structured_risk_matrix",
+                "completeness_gate",
+                "high_residual_risk_block",
+                "two_person_approval",
+                "metadata_only",
+                "no_automatic_conformity_claim",
+            ),
+            required_controls=(
+                "persistent_encrypted_ripd_store",
+                "controller_legal_review",
+                "periodic_reassessment",
+                "document_export_and_signature",
+            ),
+        ),
+        ProcessingRecord(
+            record_id="scheduler.jobs",
+            name="Agendamentos persistentes",
+            component="atlas.scheduler.storage.SchedulerStorage",
+            nature=DataNature.PERSONAL,
+            categories=(
+                DataCategory.CONVERSATION,
+                DataCategory.PROFESSIONAL,
+                DataCategory.OPERATIONAL_AUDIT,
+            ),
+            subjects=(DataSubject.USER, DataSubject.EMPLOYEE),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.DELETE,
+            ),
+            purpose="Executar lembretes e tarefas solicitadas para outro momento.",
+            source="Comandos de agendamento do usuário.",
+            recipients=_LOCAL_RUNTIME,
+            stores=(_store("atlas_data/scheduler.json", StorageKind.JSON),),
+            retention=_retention(
+                RetentionMode.UNDEFINED,
+                "O item permanece até execução, cancelamento ou limpeza manual.",
+            ),
+            controller_role="Organização que opera o Atlas",
+            operator_roles=("Usuário autorizado",),
+            legal_basis_status=_PENDING,
+            implemented_controls=("atomic_file_replace", "manual_delete"),
+            required_controls=_BASE_REQUIRED
+            + ("at_rest_encryption", "retention_schedule"),
+        ),
+        ProcessingRecord(
+            record_id="audit.connector_and_vision_metadata",
+            name="Metadados de conectores e ações visuais",
+            component="atlas.connectors.audit e atlas.vision.audit",
+            nature=DataNature.PERSONAL,
+            categories=(
+                DataCategory.IDENTIFICATION,
+                DataCategory.OPERATIONAL_AUDIT,
+            ),
+            subjects=(DataSubject.USER, DataSubject.OPERATOR),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.PSEUDONYMIZE,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+            ),
+            purpose="Comprovar autorização, resultado e segurança das ações.",
+            source="Guards de conectores e fluxo de automação visual.",
+            recipients=("Administrador do Atlas",),
+            stores=(
+                _store(
+                    "Memória do processo ou arquivo de auditoria configurado",
+                    StorageKind.VOLATILE_MEMORY,
+                    encrypted=None,
+                    ephemeral=True,
+                ),
+            ),
+            retention=_retention(
+                RetentionMode.UNDEFINED,
+                "O destino persistente é opcional e ainda não tem prazo comum.",
+            ),
+            controller_role="Organização que opera o Atlas",
+            operator_roles=("Administrador do Atlas",),
+            legal_basis_status=_PENDING,
+            implemented_controls=(
+                "no_private_parameters",
+                "hashed_idempotency_key",
+                "metadata_only",
+            ),
+            required_controls=_BASE_REQUIRED + ("retention_schedule",),
+        ),
+        ProcessingRecord(
+            record_id="logs.application_diagnostics",
+            name="Logs de execução e diagnóstico",
+            component="atlas.utils.logging_setup",
+            nature=DataNature.PERSONAL,
+            categories=(DataCategory.CONVERSATION, DataCategory.OPERATIONAL_AUDIT),
+            subjects=(DataSubject.USER, DataSubject.OPERATOR, DataSubject.THIRD_PARTY),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+            ),
+            purpose="Diagnosticar erros e acompanhar a execução do aplicativo.",
+            source="Componentes que usam o logger do Atlas.",
+            recipients=("Administrador local do Atlas",),
+            stores=(_store("logs/atlas.log", StorageKind.LOG),),
+            retention=_retention(
+                RetentionMode.UNDEFINED,
+                "Não há rotação ou expiração comum configurada.",
+            ),
+            controller_role="Organização que opera o Atlas",
+            operator_roles=("Administrador do Atlas",),
+            legal_basis_status=_PENDING,
+            implemented_controls=("local_storage",),
+            required_controls=_BASE_REQUIRED
+            + ("log_redaction", "retention_schedule", "at_rest_encryption"),
+        ),
+        ProcessingRecord(
+            record_id="secrets.runtime_credentials",
+            name="Credenciais e segredos de integração",
+            component="atlas.core.config e arquivo .env local",
+            nature=DataNature.SECURITY_SECRET,
+            categories=(DataCategory.AUTHENTICATION, DataCategory.IDENTIFICATION),
+            subjects=(DataSubject.OPERATOR,),
+            operations=(
+                ProcessingOperation.COLLECT,
+                ProcessingOperation.STORE,
+                ProcessingOperation.ACCESS,
+                ProcessingOperation.TRANSMIT,
+            ),
+            purpose="Autenticar APIs e conectores explicitamente configurados.",
+            source="Administrador da instalação.",
+            recipients=("Runtime local", "Provedor correspondente ao segredo"),
+            stores=(_store(".env local não versionado", StorageKind.JSON),),
+            retention=_retention(
+                RetentionMode.UNDEFINED,
+                "Permanece até rotação ou remoção manual pelo administrador.",
+            ),
+            controller_role="Organização proprietária das credenciais",
+            operator_roles=("Administrador do Atlas",),
+            legal_basis_status=_PENDING,
+            implemented_controls=("not_in_example", "not_in_delivery_zip"),
+            required_controls=(
+                "secret_store",
+                "credential_rotation",
+                "access_control",
+            ),
+            notes="O inventário registra apenas nomes de locais, nunca valores.",
+        ),
+    )
+    return ProcessingInventory(records)

@@ -2,25 +2,38 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import re
 
 from dotenv import load_dotenv
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT_DIR / ".env")
+from atlas.core.paths import resolve_runtime_paths
+
+RUNTIME_PATHS = resolve_runtime_paths(module_file=__file__)
+ROOT_DIR = RUNTIME_PATHS.install_root
+load_dotenv(RUNTIME_PATHS.config_file)
 
 PROJECT_DIR = Path(
     os.getenv("ATLAS_PROJECT_DIR", str(ROOT_DIR))
 ).expanduser().resolve()
 
-DATA_DIR = ROOT_DIR / "data"
-LOG_DIR = ROOT_DIR / "logs"
-DATA_DIR.mkdir(exist_ok=True)
-LOG_DIR.mkdir(exist_ok=True)
+DATA_DIR = RUNTIME_PATHS.data_dir
+LOG_DIR = RUNTIME_PATHS.log_dir
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 ATLAS_NAME = os.getenv("ATLAS_NAME", "Atlas")
 USER_NAME = os.getenv("ATLAS_USER", "Ssamir")
 OLLAMA_MODEL = os.getenv("ATLAS_MODEL", "atlas")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
+
+# Atlas Core 1.0 — perfil global de execução. Valores inválidos retornam ao
+# modo automático para evitar inicialização com uma configuração desconhecida.
+ATLAS_RUNTIME_PROFILE = os.getenv(
+    "ATLAS_RUNTIME_PROFILE",
+    "auto",
+).strip().lower()
+if ATLAS_RUNTIME_PROFILE not in {"auto", "lite", "standard", "full"}:
+    ATLAS_RUNTIME_PROFILE = "auto"
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -70,6 +83,40 @@ def _env_int(name: str, default: int, *, minimum: int) -> int:
         return default
 
     return parsed if parsed >= minimum else default
+
+
+_OLLAMA_MODEL_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/:+-]{0,127}$")
+
+
+def _env_model(name: str, default: str) -> str:
+    value = os.getenv(name, default).strip()
+    return value if _OLLAMA_MODEL_NAME.fullmatch(value) else default
+
+
+# Atlas Core 1.0 — Model Router. Por padrão todos os perfis mantêm o modelo
+# atual; modelos diferentes só entram após configuração explícita no .env.
+OLLAMA_MODEL_LITE = _env_model("ATLAS_MODEL_LITE", OLLAMA_MODEL)
+OLLAMA_MODEL_STANDARD = _env_model("ATLAS_MODEL_STANDARD", OLLAMA_MODEL)
+OLLAMA_MODEL_FULL = _env_model("ATLAS_MODEL_FULL", OLLAMA_MODEL)
+OLLAMA_TAGS_URL = os.getenv(
+    "OLLAMA_TAGS_URL",
+    "http://localhost:11434/api/tags",
+).strip()
+OLLAMA_INVENTORY_TIMEOUT = _env_float(
+    "ATLAS_MODEL_INVENTORY_TIMEOUT",
+    2.0,
+    minimum=0.1,
+    maximum=10.0,
+)
+
+# O executável usa o Edge já presente no Windows e evita baixar um navegador
+# adicional. No modo fonte, a instalação atual do Chromium continua igual.
+BROWSER_CHANNEL = os.getenv(
+    "ATLAS_BROWSER_CHANNEL",
+    "msedge" if RUNTIME_PATHS.frozen else "",
+).strip().lower()
+if BROWSER_CHANNEL not in {"", "msedge", "chrome"}:
+    BROWSER_CHANNEL = ""
 
 
 EMBEDDINGS_ENABLED = _env_bool("ATLAS_EMBEDDINGS", True)

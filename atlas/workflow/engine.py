@@ -5,6 +5,11 @@ import time
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
+from atlas.core.resource_manager import (
+    ResourceAdmissionError,
+    ResourceManager,
+    WorkloadClass,
+)
 from atlas.planner.results import ExecutionResult
 from atlas.planner.task_manager import TaskManager
 from atlas.workflow.cancellation import WorkflowCancelledError
@@ -40,11 +45,64 @@ class WorkflowEngine:
         self,
         executor: Executor,
         task_manager: TaskManager,
+        resource_manager: ResourceManager | None = None,
     ) -> None:
         self.executor = executor
         self.task_manager = task_manager
+        self.resource_manager = resource_manager
 
     def execute(
+        self,
+        state: WorkflowState,
+    ) -> WorkflowResult:
+        if self.resource_manager is None:
+            return self._execute_admitted(state)
+
+        workload = self._classify_workload(state)
+        try:
+            with self.resource_manager.reserve(workload):
+                return self._execute_admitted(state)
+        except ResourceAdmissionError as error:
+            admission = error.admission
+            result = ExecutionResult.fail(
+                action_type="resource.admission",
+                message=(
+                    "O Atlas está preservando os recursos do computador. "
+                    "Tente novamente quando a carga diminuir."
+                ),
+                error_code=admission.outcome.value,
+                retryable=admission.retryable,
+                data={
+                    "profile": self.resource_manager.profile.selected.value,
+                    "pressure": admission.pressure.value,
+                    "reason_codes": list(admission.reason_codes),
+                },
+            )
+            return WorkflowResult.failed_result(
+                completed_steps=0,
+                total_steps=len(state.steps),
+                results=[result],
+                error=result.message,
+            )
+
+    @staticmethod
+    def _classify_workload(state: WorkflowState) -> WorkloadClass:
+        action_types = tuple(step.action.type for step in state.steps)
+        if any(
+            action_type.startswith(
+                ("internet.", "programming.", "coding.", "domain.programming")
+            )
+            for action_type in action_types
+        ):
+            return WorkloadClass.HEAVY
+        if action_types and all(
+            action_type in {"system.wait", "scheduler"}
+            for action_type in action_types
+        ):
+            return WorkloadClass.LIGHT
+        return WorkloadClass.STANDARD
+
+    def _execute_admitted(
         self,
         state: WorkflowState,
     ) -> WorkflowResult:

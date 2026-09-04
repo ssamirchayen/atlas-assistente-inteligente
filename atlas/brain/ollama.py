@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import requests
 
+from atlas.brain.model_router import ModelRouteDecision, ModelRouter
 from atlas.context.manager import ContextManager
 from atlas.core.config import (
     OLLAMA_MODEL,
@@ -11,9 +12,16 @@ from atlas.core.config import (
 
 
 class OllamaBrain:
-    def __init__(self, context: ContextManager) -> None:
+    def __init__(
+        self,
+        context: ContextManager,
+        *,
+        model_router: ModelRouter | None = None,
+    ) -> None:
         self.history: list[dict[str, str]] = []
         self.context = context
+        self.model_router = model_router
+        self.last_model_decision: ModelRouteDecision | None = None
 
     def respond(
         self,
@@ -69,14 +77,27 @@ class OllamaBrain:
             }
         )
 
+        model_name = OLLAMA_MODEL
+        context_limit: int | None = None
+        if self.model_router is not None:
+            self.last_model_decision = self.model_router.route(
+                self.model_router.classify(user_text)
+            )
+            model_name = self.last_model_decision.model_name
+            context_limit = self.last_model_decision.context_limit
+
+        payload: dict[str, object] = {
+            "model": model_name,
+            "messages": messages,
+            "stream": False,
+        }
+        if context_limit is not None:
+            payload["options"] = {"num_ctx": context_limit}
+
         try:
             response = requests.post(
                 OLLAMA_URL,
-                json={
-                    "model": OLLAMA_MODEL,
-                    "messages": messages,
-                    "stream": False,
-                },
+                json=payload,
                 timeout=180,
             )
 

@@ -23,6 +23,15 @@ from PySide6.QtWidgets import (
 )
 
 from atlas.core.config import ATLAS_NAME, USER_NAME
+from atlas.admin.service import AdminConsoleService
+from atlas.gui.admin_console import AdminConsoleDialog
+from atlas.gui.orb import AtlasOrb
+from atlas.gui.theme import (
+    MESSAGE_PALETTE,
+    STATUS_PALETTE,
+    VERSION_LABEL,
+    application_stylesheet,
+)
 from atlas.gui.service import (
     AtlasGuiService,
     GuiCommandResult,
@@ -94,6 +103,7 @@ class AtlasWindow(QMainWindow):
         self.speaking = False
         self._resume_available = False
         self.vision_overlay = VisionOverlayWindow()
+        self.admin_console: AdminConsoleDialog | None = None
 
         self._connect_signals()
         self._configure_window()
@@ -129,10 +139,10 @@ class AtlasWindow(QMainWindow):
         self.signals.speech_finished.connect(self.on_speech_finished)
 
     def _configure_window(self) -> None:
-        self.setWindowTitle(f"{ATLAS_NAME} — Assistente Inteligente")
-        self.resize(1280, 800)
-        self.setMinimumSize(1000, 650)
-        self.setStyleSheet(self._stylesheet())
+        self.setWindowTitle(f"{ATLAS_NAME} — Intelligence Workspace")
+        self.resize(1500, 920)
+        self.setMinimumSize(1180, 760)
+        self.setStyleSheet(application_stylesheet())
 
     def _build_interface(self) -> None:
         root = QWidget()
@@ -147,35 +157,50 @@ class AtlasWindow(QMainWindow):
         workspace = QWidget()
         workspace.setObjectName("workspace")
         page = QVBoxLayout(workspace)
-        page.setContentsMargins(30, 24, 30, 24)
+        page.setContentsMargins(28, 24, 28, 24)
         page.setSpacing(18)
         page.addWidget(self._build_header())
-        page.addWidget(self._build_conversation_card(), stretch=1)
-        page.addWidget(self._build_command_panel())
+
+        body = QHBoxLayout()
+        body.setSpacing(16)
+
+        conversation_column = QWidget()
+        conversation_column.setObjectName("conversationColumn")
+        conversation_layout = QVBoxLayout(conversation_column)
+        conversation_layout.setContentsMargins(0, 0, 0, 0)
+        conversation_layout.setSpacing(12)
+        conversation_layout.addWidget(
+            self._build_conversation_card(),
+            stretch=1,
+        )
+        conversation_layout.addWidget(self._build_command_panel())
+
+        body.addWidget(conversation_column, stretch=1)
+        body.addWidget(self._build_insights_rail())
+        page.addLayout(body, stretch=1)
 
         shell.addWidget(workspace, stretch=1)
 
     def _build_sidebar(self) -> QFrame:
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(248)
+        sidebar.setFixedWidth(246)
         layout = QVBoxLayout(sidebar)
-        layout.setContentsMargins(22, 24, 22, 22)
-        layout.setSpacing(16)
+        layout.setContentsMargins(20, 22, 20, 20)
+        layout.setSpacing(10)
 
         brand = QHBoxLayout()
         brand.setSpacing(12)
-
         logo = QLabel("A")
         logo.setObjectName("logoBadge")
-        logo.setFixedSize(44, 44)
+        logo.setFixedSize(46, 46)
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         identity = QVBoxLayout()
-        identity.setSpacing(1)
+        identity.setSpacing(0)
         brand_name = QLabel(ATLAS_NAME.upper())
         brand_name.setObjectName("sidebarBrand")
-        brand_caption = QLabel("INTELLIGENCE CORE")
+        brand_caption = QLabel("by NEXYRA")
         brand_caption.setObjectName("sidebarCaption")
         identity.addWidget(brand_name)
         identity.addWidget(brand_caption)
@@ -185,86 +210,69 @@ class AtlasWindow(QMainWindow):
         brand.addStretch()
         layout.addLayout(brand)
 
+        product_caption = QLabel("LOCAL INTELLIGENCE SYSTEM")
+        product_caption.setObjectName("productCaption")
+        layout.addWidget(product_caption)
+
         divider = QFrame()
         divider.setObjectName("sidebarDivider")
         divider.setFrameShape(QFrame.Shape.HLine)
         layout.addWidget(divider)
 
-        section = QLabel("ÁREA DE TRABALHO")
+        section = QLabel("WORKSPACE")
         section.setObjectName("sidebarSection")
         layout.addWidget(section)
 
-        current_area = QFrame()
-        current_area.setObjectName("activeArea")
-        current_layout = QHBoxLayout(current_area)
-        current_layout.setContentsMargins(12, 11, 12, 11)
-        current_layout.setSpacing(10)
+        active_area = QFrame()
+        active_area.setObjectName("activeArea")
+        active_layout = QHBoxLayout(active_area)
+        active_layout.setContentsMargins(12, 10, 12, 10)
+        active_layout.setSpacing(10)
         area_mark = QLabel("●")
         area_mark.setObjectName("activeAreaMark")
         area_label = QLabel("Conversa")
         area_label.setObjectName("activeAreaText")
-        current_layout.addWidget(area_mark)
-        current_layout.addWidget(area_label)
-        current_layout.addStretch()
-        layout.addWidget(current_area)
+        active_layout.addWidget(area_mark)
+        active_layout.addWidget(area_label)
+        active_layout.addStretch()
+        layout.addWidget(active_area)
 
-        overview_title = QLabel("OPERAÇÃO")
-        overview_title.setObjectName("sidebarSection")
-        layout.addWidget(overview_title)
+        self.history_button = QPushButton("Histórico da sessão")
+        self.history_button.setObjectName("sidebarButton")
+        self.history_button.clicked.connect(self.show_session_history)
+        layout.addWidget(self.history_button)
 
-        operation = QFrame()
-        operation.setObjectName("operationCard")
-        operation_layout = QVBoxLayout(operation)
-        operation_layout.setContentsMargins(14, 14, 14, 14)
-        operation_layout.setSpacing(12)
+        self.admin_button = QPushButton("Admin Console")
+        self.admin_button.setObjectName("sidebarButton")
+        self.admin_button.clicked.connect(self.show_admin_console)
+        layout.addWidget(self.admin_button)
 
-        workflow_caption = QLabel("Workflow")
-        workflow_caption.setObjectName("sideMetricCaption")
-        self.workflow_label = QLabel("Pronto")
-        self.workflow_label.setObjectName("sideMetricValue")
+        self.resume_button = QPushButton("Retomar pendência")
+        self.resume_button.setObjectName("sidebarAccentButton")
+        self.resume_button.setEnabled(False)
+        self.resume_button.clicked.connect(self.resume_workflow)
+        layout.addWidget(self.resume_button)
 
-        mode_caption = QLabel("Modo de interação")
-        mode_caption.setObjectName("sideMetricCaption")
-        self.mode_label = QLabel("Texto + voz")
-        self.mode_label.setObjectName("sideMetricValue")
-
-        operation_layout.addWidget(workflow_caption)
-        operation_layout.addWidget(self.workflow_label)
-        operation_layout.addWidget(mode_caption)
-        operation_layout.addWidget(self.mode_label)
-        layout.addWidget(operation)
-
-        resources_title = QLabel("RECURSOS DO SISTEMA")
-        resources_title.setObjectName("sidebarSection")
-        layout.addWidget(resources_title)
-
-        self.cpu_label = QLabel("CPU   0%")
-        self.cpu_label.setObjectName("resourceLabel")
-        self.cpu_bar = QProgressBar()
-        self.cpu_bar.setObjectName("resourceBar")
-        self.cpu_bar.setRange(0, 100)
-        self.cpu_bar.setValue(0)
-        self.cpu_bar.setTextVisible(False)
-
-        self.ram_label = QLabel("MEMÓRIA   0%")
-        self.ram_label.setObjectName("resourceLabel")
-        self.ram_bar = QProgressBar()
-        self.ram_bar.setObjectName("resourceBar")
-        self.ram_bar.setRange(0, 100)
-        self.ram_bar.setValue(0)
-        self.ram_bar.setTextVisible(False)
-
-        layout.addWidget(self.cpu_label)
-        layout.addWidget(self.cpu_bar)
-        layout.addWidget(self.ram_label)
-        layout.addWidget(self.ram_bar)
         layout.addStretch()
 
-        local_badge = QLabel("●  PROCESSAMENTO LOCAL")
-        local_badge.setObjectName("localBadge")
-        layout.addWidget(local_badge)
+        privacy = QFrame()
+        privacy.setObjectName("privacyCard")
+        privacy_layout = QVBoxLayout(privacy)
+        privacy_layout.setContentsMargins(13, 12, 13, 12)
+        privacy_layout.setSpacing(4)
+        privacy_title = QLabel("PRIVACY FIRST")
+        privacy_title.setObjectName("privacyTitle")
+        privacy_text = QLabel(
+            "Processamento local por padrão. Integrações externas "
+            "somente quando habilitadas."
+        )
+        privacy_text.setWordWrap(True)
+        privacy_text.setObjectName("privacyText")
+        privacy_layout.addWidget(privacy_title)
+        privacy_layout.addWidget(privacy_text)
+        layout.addWidget(privacy)
 
-        version = QLabel("ATLAS CORE  •  SPRINT 21")
+        version = QLabel(VERSION_LABEL)
         version.setObjectName("versionLabel")
         layout.addWidget(version)
         return sidebar
@@ -273,32 +281,79 @@ class AtlasWindow(QMainWindow):
         frame = QFrame()
         frame.setObjectName("topHeader")
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
 
         heading = QVBoxLayout()
         heading.setSpacing(3)
-        title = QLabel(f"Conversa com o {ATLAS_NAME}")
+        eyebrow = QLabel("NEXYRA  /  ATLAS INTELLIGENCE")
+        eyebrow.setObjectName("pageEyebrow")
+        title = QLabel("Workspace")
         title.setObjectName("pageTitle")
         subtitle = QLabel(
-            "Comande suas rotinas e acompanhe cada execução em tempo real."
+            "Comando, contexto e automação em uma única interface operacional."
         )
         subtitle.setObjectName("pageSubtitle")
+        heading.addWidget(eyebrow)
         heading.addWidget(title)
         heading.addWidget(subtitle)
         layout.addLayout(heading)
         layout.addStretch()
 
+        for caption_text, value_text in (
+            ("ENGINE", "Atlas Core"),
+            ("RUNTIME", "Local"),
+        ):
+            signal = QFrame()
+            signal.setObjectName("headerSignal")
+            signal_layout = QVBoxLayout(signal)
+            signal_layout.setContentsMargins(12, 8, 12, 8)
+            signal_layout.setSpacing(1)
+            caption = QLabel(caption_text)
+            caption.setObjectName("headerSignalCaption")
+            value = QLabel(value_text)
+            value.setObjectName("headerSignalValue")
+            signal_layout.addWidget(caption)
+            signal_layout.addWidget(value)
+            layout.addWidget(signal)
+
+        clock_signal = QFrame()
+        clock_signal.setObjectName("headerSignal")
+        clock_layout = QVBoxLayout(clock_signal)
+        clock_layout.setContentsMargins(12, 8, 12, 8)
+        clock_layout.setSpacing(1)
+        clock_caption = QLabel("LOCAL TIME")
+        clock_caption.setObjectName("headerSignalCaption")
+        self.clock_label = QLabel(datetime.now().strftime("%H:%M"))
+        self.clock_label.setObjectName("headerSignalValue")
+        clock_layout.addWidget(clock_caption)
+        clock_layout.addWidget(self.clock_label)
+        layout.addWidget(clock_signal)
+
+        user_card = QFrame()
+        user_card.setObjectName("userCard")
+        user_layout = QHBoxLayout(user_card)
+        user_layout.setContentsMargins(10, 7, 11, 7)
+        user_layout.setSpacing(9)
+
+        avatar = QLabel(USER_NAME[:1].upper() if USER_NAME else "U")
+        avatar.setObjectName("userAvatar")
+        avatar.setFixedSize(36, 36)
+        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         user_block = QVBoxLayout()
-        user_block.setSpacing(4)
+        user_block.setSpacing(2)
         user_name = QLabel(USER_NAME)
         user_name.setObjectName("userName")
-        user_name.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.status_label = QLabel("●  ONLINE")
         self.status_label.setObjectName("status")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         user_block.addWidget(user_name)
         user_block.addWidget(self.status_label)
-        layout.addLayout(user_block)
+
+        user_layout.addWidget(avatar)
+        user_layout.addLayout(user_block)
+        layout.addWidget(user_card)
         return frame
 
     def _build_conversation_card(self) -> QFrame:
@@ -311,23 +366,25 @@ class AtlasWindow(QMainWindow):
         conversation_header = QFrame()
         conversation_header.setObjectName("conversationHeader")
         header_layout = QHBoxLayout(conversation_header)
-        header_layout.setContentsMargins(20, 15, 20, 15)
+        header_layout.setContentsMargins(18, 13, 18, 13)
+        header_layout.setSpacing(10)
 
-        title = QLabel("Conversa")
+        assistant_avatar = QLabel("A")
+        assistant_avatar.setObjectName("assistantAvatar")
+        assistant_avatar.setFixedSize(34, 34)
+        assistant_avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_layout.addWidget(assistant_avatar)
+
+        title_block = QVBoxLayout()
+        title_block.setSpacing(1)
+        title = QLabel("Atlas")
         title.setObjectName("conversationTitle")
-        header_layout.addWidget(title)
+        caption = QLabel("Canal principal  •  Atlas Core")
+        caption.setObjectName("conversationCaption")
+        title_block.addWidget(title)
+        title_block.addWidget(caption)
+        header_layout.addLayout(title_block)
         header_layout.addStretch()
-
-        self.history_button = QPushButton("Histórico")
-        self.history_button.setObjectName("headerButton")
-        self.history_button.clicked.connect(self.show_session_history)
-        header_layout.addWidget(self.history_button)
-
-        self.resume_button = QPushButton("Retomar pendência")
-        self.resume_button.setObjectName("resumeButton")
-        self.resume_button.setEnabled(False)
-        self.resume_button.clicked.connect(self.resume_workflow)
-        header_layout.addWidget(self.resume_button)
 
         self.session_label = QLabel("●  Sessão local ativa")
         self.session_label.setObjectName("sessionLabel")
@@ -338,9 +395,9 @@ class AtlasWindow(QMainWindow):
         self.chat.setObjectName("chat")
         self.chat.setReadOnly(True)
         self.chat.setPlaceholderText(
-            "Sua conversa com o Atlas aparecerá aqui."
+            "Converse com o Atlas ou execute uma tarefa."
         )
-        self.chat.document().setDocumentMargin(16)
+        self.chat.document().setDocumentMargin(20)
         layout.addWidget(self.chat, stretch=1)
         return frame
 
@@ -348,11 +405,11 @@ class AtlasWindow(QMainWindow):
         frame = QFrame()
         frame.setObjectName("commandPanel")
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(16, 12, 16, 14)
-        layout.setSpacing(10)
+        layout.setContentsMargins(14, 11, 14, 12)
+        layout.setSpacing(9)
 
         activity = QHBoxLayout()
-        activity.setSpacing(10)
+        activity.setSpacing(8)
         activity_mark = QLabel("●")
         activity_mark.setObjectName("activityMark")
         self.activity_label = QLabel("Pronto para receber comandos")
@@ -361,7 +418,7 @@ class AtlasWindow(QMainWindow):
         activity.addWidget(self.activity_label)
         activity.addStretch()
 
-        self.cancel_button = QPushButton("Cancelar execução")
+        self.cancel_button = QPushButton("Cancelar")
         self.cancel_button.setObjectName("cancelButton")
         self.cancel_button.setEnabled(False)
         self.cancel_button.clicked.connect(self.cancel_workflow)
@@ -369,16 +426,16 @@ class AtlasWindow(QMainWindow):
         layout.addLayout(activity)
 
         command_bar = QHBoxLayout()
-        command_bar.setSpacing(10)
+        command_bar.setSpacing(8)
 
         self.input = QLineEdit()
         self.input.setObjectName("commandInput")
         self.input.setPlaceholderText(
-            "Digite uma mensagem ou comando para o Atlas..."
+            "Mensagem, pergunta ou comando para o Atlas..."
         )
         self.input.returnPressed.connect(self.send_command)
 
-        self.mic_button = QPushButton("Usar microfone")
+        self.mic_button = QPushButton("Microfone")
         self.mic_button.setObjectName("secondaryButton")
         self.mic_button.clicked.connect(self.start_listening)
 
@@ -398,13 +455,159 @@ class AtlasWindow(QMainWindow):
         command_bar.addWidget(self.send_button)
         layout.addLayout(command_bar)
 
+        self.processing_bar = QProgressBar()
+        self.processing_bar.setObjectName("processingBar")
+        self.processing_bar.setRange(0, 100)
+        self.processing_bar.setValue(100)
+        self.processing_bar.setTextVisible(False)
+        layout.addWidget(self.processing_bar)
+
         hint = QLabel(
-            "Pressione Enter para enviar  •  "
-            "Os comandos são processados pelo núcleo local do Atlas"
+            "Enter para enviar  •  processamento local  •  "
+            "diga 'Atlas, pare' para interromper"
         )
         hint.setObjectName("commandHint")
         layout.addWidget(hint)
         return frame
+
+    def _build_insights_rail(self) -> QFrame:
+        rail = QFrame()
+        rail.setObjectName("insightsRail")
+        rail.setFixedWidth(300)
+        layout = QVBoxLayout(rail)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        pulse = QFrame()
+        pulse.setObjectName("heroMetricCard")
+        pulse_layout = QVBoxLayout(pulse)
+        pulse_layout.setContentsMargins(16, 15, 16, 15)
+        pulse_layout.setSpacing(10)
+
+        orb_row = QHBoxLayout()
+        orb_row.setSpacing(12)
+        self.atlas_orb = AtlasOrb()
+        orb_copy = QVBoxLayout()
+        orb_copy.setSpacing(3)
+        pulse_title = QLabel("Atlas Pulse")
+        pulse_title.setObjectName("pulseTitle")
+        pulse_text = QLabel("Estado cognitivo e operacional")
+        pulse_text.setObjectName("pulseText")
+        self.orb_state_label = QLabel("ONLINE")
+        self.orb_state_label.setObjectName("orbState")
+        orb_copy.addWidget(pulse_title)
+        orb_copy.addWidget(pulse_text)
+        orb_copy.addSpacing(4)
+        orb_copy.addWidget(self.orb_state_label)
+        orb_copy.addStretch()
+        orb_row.addWidget(self.atlas_orb)
+        orb_row.addLayout(orb_copy, stretch=1)
+        pulse_layout.addLayout(orb_row)
+
+        pulse_divider = QFrame()
+        pulse_divider.setObjectName("softDivider")
+        pulse_divider.setFrameShape(QFrame.Shape.HLine)
+        pulse_layout.addWidget(pulse_divider)
+
+        workflow_caption = QLabel("WORKFLOW")
+        workflow_caption.setObjectName("metricCaption")
+        self.workflow_label = QLabel("Pronto")
+        self.workflow_label.setObjectName("metricValue")
+        mode_caption = QLabel("INTERAÇÃO")
+        mode_caption.setObjectName("metricCaption")
+        self.mode_label = QLabel("Texto + voz")
+        self.mode_label.setObjectName("metricValue")
+        pulse_layout.addWidget(workflow_caption)
+        pulse_layout.addWidget(self.workflow_label)
+        pulse_layout.addWidget(mode_caption)
+        pulse_layout.addWidget(self.mode_label)
+
+        capability_row = QHBoxLayout()
+        capability_row.setSpacing(6)
+        for label_text in ("VOICE", "VISION", "MEMORY"):
+            chip = QLabel(label_text)
+            chip.setObjectName("capabilityChip")
+            chip.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            capability_row.addWidget(chip)
+        pulse_layout.addLayout(capability_row)
+        layout.addWidget(pulse)
+
+        resources = QFrame()
+        resources.setObjectName("infoCard")
+        resources_layout = QVBoxLayout(resources)
+        resources_layout.setContentsMargins(16, 14, 16, 15)
+        resources_layout.setSpacing(8)
+        resources_title = QLabel("Recursos")
+        resources_title.setObjectName("cardTitle")
+        resources_caption = QLabel("Telemetria local")
+        resources_caption.setObjectName("cardCaption")
+        resources_layout.addWidget(resources_title)
+        resources_layout.addWidget(resources_caption)
+
+        self.cpu_label = QLabel("CPU   0%")
+        self.cpu_label.setObjectName("resourceLabel")
+        self.cpu_bar = QProgressBar()
+        self.cpu_bar.setObjectName("resourceBar")
+        self.cpu_bar.setRange(0, 100)
+        self.cpu_bar.setValue(0)
+        self.cpu_bar.setTextVisible(False)
+
+        self.ram_label = QLabel("MEMÓRIA   0%")
+        self.ram_label.setObjectName("resourceLabel")
+        self.ram_bar = QProgressBar()
+        self.ram_bar.setObjectName("resourceBar")
+        self.ram_bar.setRange(0, 100)
+        self.ram_bar.setValue(0)
+        self.ram_bar.setTextVisible(False)
+
+        resources_layout.addWidget(self.cpu_label)
+        resources_layout.addWidget(self.cpu_bar)
+        resources_layout.addWidget(self.ram_label)
+        resources_layout.addWidget(self.ram_bar)
+        layout.addWidget(resources)
+
+        quick = QFrame()
+        quick.setObjectName("infoCard")
+        quick_layout = QVBoxLayout(quick)
+        quick_layout.setContentsMargins(16, 14, 16, 15)
+        quick_layout.setSpacing(7)
+        quick_title = QLabel("Ações rápidas")
+        quick_title.setObjectName("cardTitle")
+        quick_caption = QLabel("Acesso às ferramentas do workspace")
+        quick_caption.setObjectName("cardCaption")
+        quick_layout.addWidget(quick_title)
+        quick_layout.addWidget(quick_caption)
+
+        history_quick = QPushButton("Histórico operacional")
+        history_quick.setObjectName("quickButton")
+        history_quick.clicked.connect(self.show_session_history)
+        admin_quick = QPushButton("Abrir Admin Console")
+        admin_quick.setObjectName("quickButton")
+        admin_quick.clicked.connect(self.show_admin_console)
+        quick_layout.addWidget(history_quick)
+        quick_layout.addWidget(admin_quick)
+        layout.addWidget(quick)
+
+        trust = QFrame()
+        trust.setObjectName("infoCard")
+        trust_layout = QVBoxLayout(trust)
+        trust_layout.setContentsMargins(16, 14, 16, 15)
+        trust_layout.setSpacing(7)
+        trust_title = QLabel("Ambiente")
+        trust_title.setObjectName("cardTitle")
+        trust_caption = QLabel(
+            "Execução local e controle do usuário como padrão."
+        )
+        trust_caption.setObjectName("cardBody")
+        trust_caption.setWordWrap(True)
+        local = QLabel("●  Núcleo local ativo")
+        local.setObjectName("localState")
+        trust_layout.addWidget(trust_title)
+        trust_layout.addWidget(trust_caption)
+        trust_layout.addWidget(local)
+        layout.addWidget(trust)
+        layout.addStretch()
+        return rail
 
     def _start_system_monitor(self) -> None:
         self.timer = QTimer(self)
@@ -418,6 +621,7 @@ class AtlasWindow(QMainWindow):
         self.ram_label.setText(f"MEMÓRIA   {ram}%")
         self.cpu_bar.setValue(cpu)
         self.ram_bar.setValue(ram)
+        self.clock_label.setText(datetime.now().strftime("%H:%M"))
 
     def send_command(self) -> None:
         command = self.input.text().strip()
@@ -548,6 +752,19 @@ class AtlasWindow(QMainWindow):
         self.add_system_message(
             "Histórico operacional recente:\n" + "\n".join(entries)
         )
+
+    def show_admin_console(self) -> None:
+        """Abre o diagnóstico local sem carregar componentes lazy."""
+
+        if self.admin_console is None:
+            self.admin_console = AdminConsoleDialog(
+                AdminConsoleService(self.service.kernel),
+                parent=self,
+            )
+        self.admin_console.refresh()
+        self.admin_console.show()
+        self.admin_console.raise_()
+        self.admin_console.activateWindow()
 
     def resume_workflow(self) -> None:
         """Solicita confirmação e retoma somente etapas pendentes."""
@@ -887,34 +1104,36 @@ class AtlasWindow(QMainWindow):
 
     def set_status(self, status: str) -> None:
         normalized = status.upper()
-        colors = {
-            "ONLINE": ("#157347", "#E9F7EF", "#B8E0C8"),
-            "ESCUTA ATIVA": ("#036666", "#E8FAF8", "#A7DED8"),
-            "OUVINDO": ("#9A6700", "#FFF8E6", "#F3D48A"),
-            "EXECUTANDO": ("#1D4ED8", "#EEF4FF", "#BBD0FF"),
-            "PROCESSANDO": ("#1D4ED8", "#EEF4FF", "#BBD0FF"),
-            "FALANDO": ("#6D28D9", "#F4F0FF", "#D8C7FF"),
-            "CONCLUÍDO": ("#157347", "#E9F7EF", "#B8E0C8"),
-            "CANCELANDO": ("#A14D00", "#FFF4E8", "#F4C99D"),
-            "CANCELADO": ("#A14D00", "#FFF4E8", "#F4C99D"),
-            "INTERROMPIDO": ("#A14D00", "#FFF4E8", "#F4C99D"),
-            "NÃO ENTENDI": ("#A14D00", "#FFF4E8", "#F4C99D"),
-            "ATENÇÃO": ("#A14D00", "#FFF4E8", "#F4C99D"),
-            "ERRO": ("#B42318", "#FFF0F0", "#F3B8B4"),
-        }
-        foreground, background, border = colors.get(
+        foreground, background, border = STATUS_PALETTE.get(
             normalized,
-            ("#475467", "#F2F4F7", "#D0D5DD"),
+            STATUS_PALETTE["DEFAULT"],
         )
         self.status_label.setText(f"●  {normalized}")
+        if hasattr(self, "atlas_orb"):
+            self.atlas_orb.set_state(normalized)
+        if hasattr(self, "orb_state_label"):
+            self.orb_state_label.setText(normalized)
+        if hasattr(self, "processing_bar"):
+            active_states = {
+                "EXECUTANDO",
+                "PROCESSANDO",
+                "OUVINDO",
+                "FALANDO",
+                "CANCELANDO",
+            }
+            if normalized in active_states:
+                self.processing_bar.setRange(0, 0)
+            else:
+                self.processing_bar.setRange(0, 100)
+                self.processing_bar.setValue(100)
         self.status_label.setStyleSheet(
             "QLabel#status {"
             f"color: {foreground};"
             f"background: {background};"
             f"border: 1px solid {border};"
-            "border-radius: 11px;"
-            "padding: 5px 11px;"
-            "font-size: 10px;"
+            "border-radius: 10px;"
+            "padding: 4px 9px;"
+            "font-size: 9px;"
             "font-weight: 700;"
             "}"
         )
@@ -956,6 +1175,7 @@ class AtlasWindow(QMainWindow):
         self.continuous_button.setEnabled(not self.listening)
         self.cancel_button.setEnabled(self.processing)
         self.history_button.setEnabled(idle)
+        self.admin_button.setEnabled(idle)
         self.resume_button.setEnabled(idle and self._resume_available)
         self.mic_button.setText(
             "Ouvindo..." if self.listening else "Usar microfone"
@@ -965,31 +1185,34 @@ class AtlasWindow(QMainWindow):
         )
 
     def add_user_message(self, message: str) -> None:
+        palette = MESSAGE_PALETTE["user"]
         self._append_message(
             "VOCÊ",
             message,
-            accent="#DBEAFE",
-            background="#2563EB",
-            foreground="#FFFFFF",
+            accent=palette["accent"],
+            background=palette["background"],
+            foreground=palette["foreground"],
             align_right=True,
         )
 
     def add_atlas_message(self, message: str) -> None:
+        palette = MESSAGE_PALETTE["atlas"]
         self._append_message(
             ATLAS_NAME.upper(),
             message,
-            accent="#2563EB",
-            background="#F1F5F9",
-            foreground="#1E293B",
+            accent=palette["accent"],
+            background=palette["background"],
+            foreground=palette["foreground"],
         )
 
     def add_system_message(self, message: str) -> None:
+        palette = MESSAGE_PALETTE["system"]
         self._append_message(
             "SISTEMA",
             message,
-            accent="#B45309",
-            background="#FFF7ED",
-            foreground="#78350F",
+            accent=palette["accent"],
+            background=palette["background"],
+            foreground=palette["foreground"],
         )
 
     def _append_message(
@@ -1006,18 +1229,18 @@ class AtlasWindow(QMainWindow):
         safe_message = html.escape(str(message)).replace("\n", "<br>")
         timestamp = datetime.now().strftime("%H:%M")
         alignment = "right" if align_right else "left"
-        bubble_width = "74%" if align_right else "82%"
+        bubble_width = "68%" if align_right else "78%"
 
         self.chat.append(
             f"<table align='{alignment}' width='{bubble_width}' "
-            "cellspacing='0' cellpadding='10' "
+            "cellspacing='0' cellpadding='12' "
             f"bgcolor='{background}'>"
             "<tr><td>"
             f"<span style='color:{accent}; font-size:10px; "
             f"font-weight:700;'>{safe_author}</span>"
             f"<span style='color:{accent}; font-size:9px;'>"
             f" &nbsp; {timestamp}</span><br>"
-            f"<span style='color:{foreground}; font-size:13px;'>"
+            f"<span style='color:{foreground}; font-size:13px; line-height:1.45;'>"
             f"{safe_message}</span>"
             "</td></tr></table>"
             "<div style='height:7px;'></div>"
@@ -1026,6 +1249,8 @@ class AtlasWindow(QMainWindow):
         scrollbar.setValue(scrollbar.maximum())
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        if self.admin_console is not None:
+            self.admin_console.close()
         self.vision_overlay.hide_overlay()
         self.vision_overlay.close()
         self.service.cancel()
@@ -1038,261 +1263,6 @@ class AtlasWindow(QMainWindow):
 
     @staticmethod
     def _stylesheet() -> str:
-        return """
-            QMainWindow, QWidget#root, QWidget#workspace {
-                background: #F4F7FB;
-            }
-            QLabel {
-                color: #1D2939;
-                font-family: "Segoe UI";
-            }
-            QFrame#sidebar {
-                background: #101C2E;
-                border: none;
-            }
-            QLabel#logoBadge {
-                background: #2F6FED;
-                color: #FFFFFF;
-                border-radius: 10px;
-                font-family: "Segoe UI";
-                font-size: 22px;
-                font-weight: 800;
-            }
-            QLabel#sidebarBrand {
-                color: #FFFFFF;
-                font-size: 18px;
-                font-weight: 750;
-                letter-spacing: 2px;
-            }
-            QLabel#sidebarCaption {
-                color: #8191A8;
-                font-size: 8px;
-                font-weight: 600;
-                letter-spacing: 1px;
-            }
-            QFrame#sidebarDivider {
-                color: #26364C;
-                background: #26364C;
-                border: none;
-                max-height: 1px;
-            }
-            QLabel#sidebarSection {
-                color: #718198;
-                font-size: 9px;
-                font-weight: 700;
-                letter-spacing: 1px;
-                margin-top: 4px;
-            }
-            QFrame#activeArea {
-                background: #1B2B43;
-                border: 1px solid #2C405C;
-                border-radius: 9px;
-            }
-            QLabel#activeAreaMark {
-                color: #5B8FF9;
-                font-size: 9px;
-            }
-            QLabel#activeAreaText {
-                color: #F8FAFC;
-                font-size: 12px;
-                font-weight: 650;
-            }
-            QFrame#operationCard {
-                background: #16253A;
-                border: 1px solid #263A55;
-                border-radius: 10px;
-            }
-            QLabel#sideMetricCaption {
-                color: #8191A8;
-                font-size: 10px;
-            }
-            QLabel#sideMetricValue {
-                color: #F8FAFC;
-                font-size: 12px;
-                font-weight: 650;
-            }
-            QLabel#resourceLabel {
-                color: #A8B4C6;
-                font-size: 9px;
-                font-weight: 650;
-            }
-            QProgressBar#resourceBar {
-                min-height: 5px;
-                max-height: 5px;
-                background: #26364C;
-                border: none;
-                border-radius: 2px;
-            }
-            QProgressBar#resourceBar::chunk {
-                background: #4F7FE8;
-                border-radius: 2px;
-            }
-            QLabel#localBadge {
-                color: #77D6A3;
-                font-size: 9px;
-                font-weight: 700;
-            }
-            QLabel#versionLabel {
-                color: #53647B;
-                font-size: 8px;
-                letter-spacing: 1px;
-            }
-            QFrame#topHeader {
-                background: transparent;
-                border: none;
-            }
-            QLabel#pageTitle {
-                color: #172033;
-                font-size: 24px;
-                font-weight: 750;
-            }
-            QLabel#pageSubtitle {
-                color: #667085;
-                font-size: 11px;
-            }
-            QLabel#userName {
-                color: #344054;
-                font-size: 11px;
-                font-weight: 650;
-            }
-            QFrame#conversationCard, QFrame#commandPanel {
-                background: #FFFFFF;
-                border: 1px solid #DCE3EC;
-                border-radius: 12px;
-            }
-            QFrame#conversationHeader {
-                background: #FFFFFF;
-                border: none;
-                border-bottom: 1px solid #E7ECF2;
-                border-top-left-radius: 12px;
-                border-top-right-radius: 12px;
-            }
-            QLabel#conversationTitle {
-                color: #1D2939;
-                font-size: 13px;
-                font-weight: 700;
-            }
-            QLabel#sessionLabel {
-                color: #157347;
-                font-size: 10px;
-                font-weight: 650;
-            }
-            QPushButton#headerButton,
-            QPushButton#resumeButton {
-                min-height: 14px;
-                background: #F8FAFC;
-                color: #344054;
-                border: 1px solid #D0D8E4;
-                border-radius: 7px;
-                padding: 5px 9px;
-                font-size: 9px;
-            }
-            QPushButton#headerButton:hover,
-            QPushButton#resumeButton:hover {
-                background: #EEF4FF;
-                color: #1D4ED8;
-                border-color: #AFC5F5;
-            }
-            QPushButton#resumeButton {
-                background: #EEF4FF;
-                color: #1D4ED8;
-                border-color: #BBD0FF;
-            }
-            QTextEdit#chat {
-                background: #FFFFFF;
-                color: #1D2939;
-                border: none;
-                border-bottom-left-radius: 12px;
-                border-bottom-right-radius: 12px;
-                font-family: "Segoe UI";
-                font-size: 13px;
-                selection-background-color: #D7E5FF;
-            }
-            QScrollBar:vertical {
-                background: transparent;
-                width: 8px;
-                margin: 4px 2px 4px 0;
-            }
-            QScrollBar::handle:vertical {
-                background: #C9D2DF;
-                border-radius: 4px;
-                min-height: 32px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: #AEBAC9;
-            }
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {
-                height: 0;
-            }
-            QLabel#activityMark {
-                color: #2F6FED;
-                font-size: 8px;
-            }
-            QLabel#activityText {
-                color: #667085;
-                font-size: 10px;
-                font-weight: 550;
-            }
-            QLineEdit#commandInput {
-                min-height: 22px;
-                background: #F8FAFC;
-                color: #172033;
-                border: 1px solid #CCD6E3;
-                border-radius: 9px;
-                padding: 11px 13px;
-                font-family: "Segoe UI";
-                font-size: 12px;
-            }
-            QLineEdit#commandInput:focus {
-                background: #FFFFFF;
-                border: 1px solid #2F6FED;
-            }
-            QPushButton {
-                min-height: 22px;
-                border-radius: 9px;
-                padding: 10px 16px;
-                font-family: "Segoe UI";
-                font-size: 11px;
-                font-weight: 650;
-            }
-            QPushButton#primaryButton {
-                background: #2F6FED;
-                color: #FFFFFF;
-                border: 1px solid #2F6FED;
-            }
-            QPushButton#primaryButton:hover {
-                background: #245DCE;
-                border-color: #245DCE;
-            }
-            QPushButton#secondaryButton {
-                background: #FFFFFF;
-                color: #344054;
-                border: 1px solid #C9D3E0;
-            }
-            QPushButton#secondaryButton:hover {
-                background: #F1F5F9;
-                border-color: #AEBBCC;
-            }
-            QPushButton#cancelButton {
-                min-height: 16px;
-                background: transparent;
-                color: #B42318;
-                border: 1px solid #E5AAA5;
-                padding: 5px 10px;
-                font-size: 9px;
-            }
-            QPushButton#cancelButton:hover {
-                background: #FFF1F0;
-                border-color: #D47A73;
-            }
-            QPushButton:disabled {
-                background: #F2F4F7;
-                color: #98A2B3;
-                border-color: #E4E7EC;
-            }
-            QLabel#commandHint {
-                color: #98A2B3;
-                font-size: 9px;
-            }
-        """
+        """Compatibilidade com chamadas antigas da camada gráfica."""
+
+        return application_stylesheet()

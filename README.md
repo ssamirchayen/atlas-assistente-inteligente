@@ -151,6 +151,18 @@ py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m playwright install chromium
 ```
 
+### Gerar instalador do Windows
+
+Em um computador Windows com Inno Setup 6, execute:
+
+```powershell
+.\tools\build_windows_installer.ps1 -InstallBuildDependencies
+```
+
+O pipeline testa o Atlas, gera o `Atlas.exe`, bloqueia dados privados e cria o
+instalador em `dist\installer`. O computador de destino não precisa ter Python;
+Ollama e ao menos um modelo local continuam sendo requisitos separados.
+
 ## Configuração
 
 Crie a configuração local usando somente o arquivo de exemplo:

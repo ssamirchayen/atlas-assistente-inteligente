@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "product_name": "Atlas Core",
+  "required_files": [
+    "Atlas.exe",
+    ".env.example",
+    "atlas/gui/assets/atlas_mark.svg"
+  ],
+  "forbidden_names": [
+    ".env",
+    "memory.db",
+    "api_audit.db",
+    "operational_sessions.db",
+    "last_session.json"
+  ],
+  "forbidden_suffixes": [
+    ".pyc",
+    ".pyo",
+    ".db",
+    ".sqlite",
+    ".sqlite3",
+    ".log",
+    ".key",
+    ".pem"
+  ],
+  "allowed_suffix_paths": [
+    "certifi/cacert.pem"
+  ],
+  "forbidden_directories": [
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".git",
+    ".venv",
+    "data",
+    "logs"
+  ],
+  "max_file_size_mb": 2500
+}

@@ -1,36 +1,35 @@
+from __future__ import annotations
+
+import multiprocessing
 import sys
-from pathlib import Path
-
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication
-
-from atlas.gui.window import AtlasWindow
 
 
-def main() -> None:
-    QApplication.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-    )
+def main() -> int:
+    # Self-test sem GUI para a build confirmar que o Edge TTS entrou no EXE.
+    if "--voice-selftest" in sys.argv:
+        from atlas.voice.speech import SpeechInterface
+
+        return 0 if SpeechInterface.runtime_self_test() else 7
+
+    # Imports pesados ficam dentro de main para preservar freeze_support.
+    from PySide6.QtWidgets import QApplication
+
+    from atlas.gui.single_instance import SingleInstanceGuard
+    from atlas.gui.window import AtlasWindow
+
     app = QApplication(sys.argv)
-    app.setApplicationName("Atlas")
-    app.setOrganizationName("Ssamir")
-    app.setStyle("Fusion")
+    guard = SingleInstanceGuard("NEXYRA_ATLAS_CORE_GUI")
+    if not guard.acquire():
+        return 0
 
-    icon_path = (
-        Path(__file__).resolve().parent
-        / "atlas"
-        / "gui"
-        / "assets"
-        / "atlas_mark.svg"
-    )
-    app.setWindowIcon(QIcon(str(icon_path)))
-
-    window = AtlasWindow()
-    window.show()
-
-    sys.exit(app.exec())
+    try:
+        window = AtlasWindow()
+        window.show()
+        return app.exec()
+    finally:
+        guard.release()
 
 
 if __name__ == "__main__":
-    main()
+    multiprocessing.freeze_support()
+    raise SystemExit(main())

@@ -17,12 +17,16 @@ from atlas.agents.wholesale import WholesaleAgent
 from atlas.context.manager import ContextManager
 from atlas.intent.analyzer import IntentAnalyzer
 from atlas.planner.actions import Action
-from atlas.planner.intelligent import IntelligentPlanner
+from atlas.planner.intelligent import BrainResponder, IntelligentPlanner
 from atlas.planner.parser import CommandParser
 
 
 class Planner:
-    def __init__(self, context: ContextManager) -> None:
+    def __init__(
+        self,
+        context: ContextManager,
+        brain: BrainResponder | None = None,
+    ) -> None:
         self.context = context
         self.session = context.session
         self.desktop_agent = DesktopAgent()
@@ -50,7 +54,7 @@ class Planner:
             )
         )
         self.intent_analyzer = IntentAnalyzer()
-        self.intelligent = IntelligentPlanner(context)
+        self.intelligent = IntelligentPlanner(context, brain=brain)
         self.command_parser = CommandParser()
 
     def plan(self, command: str) -> list[Action]:

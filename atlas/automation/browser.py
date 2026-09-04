@@ -11,6 +11,8 @@ from playwright.sync_api import (
     Playwright,
     sync_playwright,
 )
+
+from atlas.core.config import BROWSER_CHANNEL
 from playwright.sync_api import (
     Error as PlaywrightError,
 )
@@ -224,9 +226,10 @@ class BrowserAutomation:
             self._playwright = sync_playwright().start()
 
         if self._browser is None:
-            self._browser = self._playwright.chromium.launch(
-                headless=False,
-            )
+            launch_options: dict[str, object] = {"headless": False}
+            if BROWSER_CHANNEL:
+                launch_options["channel"] = BROWSER_CHANNEL
+            self._browser = self._playwright.chromium.launch(**launch_options)
 
         if self._context is None:
             self._context = self._browser.new_context(

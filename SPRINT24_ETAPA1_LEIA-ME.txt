@@ -1,0 +1,43 @@
+ATLAS — SPRINT 24, ETAPA 1
+================================
+
+BENCHMARKS SEGUROS DO VALIDATION LAB
+
+INSTALAÇÃO
+
+1. Feche o Atlas.
+2. Extraia este ZIP em C:\Atlas_OFICIAL.
+3. Autorize a substituição dos arquivos.
+4. Seu .env, memória, bancos e logs não fazem parte do ZIP.
+
+VALIDAÇÃO COMPLETA
+
+cd C:\Atlas_OFICIAL
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m compileall -q atlas main.py gui_main.py api_main.py atlas_validation.py
+
+BENCHMARK DA ETAPA
+
+.\.venv\Scripts\python.exe -m atlas_validation run --domain performance
+
+RELATÓRIOS LOCAIS
+
+.\.venv\Scripts\python.exe -m atlas_validation run --domain performance --json reports/sprint24_etapa1.json --markdown reports/sprint24_etapa1.md
+
+RESULTADO ESPERADO
+
+- PERF-LAB-001: PASS;
+- PERF-001 e PERF-LITE-001: PLANNED;
+- saída com p50, p95, CPU e RAM delta;
+- código de saída 0 quando os orçamentos forem respeitados.
+
+VALIDAÇÃO DESTA ENTREGA
+
+- 873 testes aprovados;
+- Ruff aprovado no projeto inteiro;
+- compilação aprovada;
+- PERF-LAB-001: PASS;
+- pacote sem .env, bancos, logs, caches ou relatórios locais.
+
+Consulte docs\SPRINT24_ETAPA1_BENCHMARKS.md.
