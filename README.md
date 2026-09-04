@@ -42,7 +42,7 @@ com foco em privacidade, confiabilidade e evolução para cenários empresariais
 - Atlas Vision estruturado em 16 etapas, com DOM/UIA, confirmação supervisionada,
   recuperação limitada e auditoria redigida;
 - Validation Lab com benchmarks p50/p95, CPU/RAM e quality gates;
-- 994 testes automatizados e validação estática com Ruff.
+- 1506 testes automatizados e validação estática com Ruff.
 
 ## Arquitetura
 
