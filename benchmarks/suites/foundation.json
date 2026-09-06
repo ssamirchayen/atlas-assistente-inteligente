@@ -1,0 +1,45 @@
+{
+  "id": "foundation",
+  "title": "Sprint 27 - Benchmark Engine Foundation",
+  "kind": "technical",
+  "description": "Safe self-test of the Atlas Benchmark orchestration layer.",
+  "tags": [
+    "sprint27",
+    "foundation",
+    "safe"
+  ],
+  "metadata": {
+    "stage": 1,
+    "synthetic": true
+  },
+  "cases": [
+    {
+      "id": "foundation.registry",
+      "title": "Executor registry",
+      "domain": "benchmark",
+      "executor": "benchmark.noop",
+      "tags": [
+        "foundation"
+      ]
+    },
+    {
+      "id": "foundation.seed",
+      "title": "Deterministic simulation seed",
+      "domain": "benchmark",
+      "executor": "benchmark.determinism",
+      "tags": [
+        "foundation",
+        "simulation"
+      ]
+    },
+    {
+      "id": "foundation.scratch",
+      "title": "Isolated scratch workspace",
+      "domain": "benchmark",
+      "executor": "benchmark.scratch",
+      "parameters": {
+        "payload": "atlas-sprint27"
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "id": "roi_productivity",
+  "title": "Sprint 27 - ROI + Productivity Engine",
+  "kind": "business_simulation",
+  "description": "Consolidates School, Help Desk, Retail and Office synthetic labs while keeping measured technical evidence, simulated operational outcomes and economic projections explicitly separated.",
+  "tags": [
+    "sprint27",
+    "roi",
+    "productivity",
+    "business-simulation",
+    "frontend-ready"
+  ],
+  "metadata": {
+    "stage": 11,
+    "synthetic": true,
+    "commercial_guarantee": false,
+    "measured_roi_claim": false,
+    "frontend_schema": "1.0",
+    "destructive_actions": false
+  },
+  "cases": [
+    {
+      "id": "roi.lab_normalization",
+      "title": "Normalize School, Help Desk, Retail and Office labs",
+      "domain": "roi",
+      "executor": "roi.lab_normalization",
+      "weight": 1.5
+    },
+    {
+      "id": "roi.productivity_math",
+      "title": "Consolidated productivity and capacity math",
+      "domain": "roi",
+      "executor": "roi.productivity_math",
+      "weight": 2.0
+    },
+    {
+      "id": "roi.economic_projection",
+      "title": "Potential reusable-capacity economic projection",
+      "domain": "roi",
+      "executor": "roi.economic_projection",
+      "weight": 1.5
+    },
+    {
+      "id": "roi.provenance_separation",
+      "title": "Measured versus simulated versus projected provenance",
+      "domain": "roi",
+      "executor": "roi.provenance_separation",
+      "weight": 2.0
+    },
+    {
+      "id": "roi.measured_history",
+      "title": "Read measured technical benchmark history separately",
+      "domain": "roi",
+      "executor": "roi.measured_history",
+      "weight": 1.0,
+      "parameters": {
+        "max_runs": 8
+      }
+    },
+    {
+      "id": "roi.sensitivity",
+      "title": "Economic sensitivity without changing operational metrics",
+      "domain": "roi",
+      "executor": "roi.sensitivity",
+      "weight": 1.25,
+      "parameters": {
+        "hourly_cost_factor": 2.0
+      }
+    },
+    {
+      "id": "roi.frontend_contract",
+      "title": "Portfolio contract for the mini benchmark frontend",
+      "domain": "roi",
+      "executor": "roi.frontend_contract",
+      "weight": 1.75,
+      "parameters": {
+        "max_measured_runs": 8
+      }
+    }
+  ]
+}

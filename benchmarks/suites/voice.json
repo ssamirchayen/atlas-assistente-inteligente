@@ -1,0 +1,136 @@
+{
+  "id": "voice",
+  "title": "Sprint 27 - Atlas Voice Benchmark",
+  "kind": "technical",
+  "description": "Voice stack readiness, command normalization, interruption intent, session telemetry, TTS chunking and optional live Edge neural synthesis.",
+  "tags": [
+    "sprint27",
+    "voice",
+    "technical"
+  ],
+  "metadata": {
+    "stage": 4,
+    "synthetic": false,
+    "live_optional": true,
+    "acoustic_stt": false
+  },
+  "cases": [
+    {
+      "id": "voice.imports",
+      "title": "Voice stack imports",
+      "domain": "voice",
+      "executor": "voice.imports",
+      "weight": 1.0,
+      "parameters": {
+        "modules": [
+          "atlas.voice.session",
+          "atlas.voice.latency",
+          "atlas.voice.command_normalizer",
+          "atlas.voice.interruption",
+          "atlas.voice.tts",
+          "atlas.voice.response",
+          "atlas.voice.continuous",
+          "atlas.voice.speech"
+        ]
+      }
+    },
+    {
+      "id": "voice.dependencies",
+      "title": "Voice runtime dependencies",
+      "domain": "voice",
+      "executor": "voice.dependencies",
+      "weight": 1.25,
+      "parameters": {
+        "dependencies": [
+          "edge_tts",
+          "speech_recognition",
+          "pyaudio"
+        ]
+      }
+    },
+    {
+      "id": "voice.configuration",
+      "title": "Neural voice runtime configuration",
+      "domain": "voice",
+      "executor": "voice.configuration",
+      "weight": 1.25,
+      "parameters": {
+        "expected_provider": "edge",
+        "expected_voice": "pt-BR-AntonioNeural",
+        "allowed_profiles": [
+          "fast",
+          "balanced",
+          "accurate"
+        ]
+      }
+    },
+    {
+      "id": "voice.command_normalizer",
+      "title": "ASR command repair accuracy",
+      "domain": "voice",
+      "executor": "voice.command_normalizer",
+      "weight": 1.5,
+      "parameters": {
+        "samples": [
+          {"input": "quick no botão enviar", "expected": "clique no botão enviar"},
+          {"input": "clica na barra pesquisa", "expected": "clique na barra de pesquisa"},
+          {"input": "digita teste final", "expected": "digite teste final"},
+          {"input": "abre o navegador", "expected": "abra o navegador"},
+          {"input": "campo pesquisa", "expected": "campo de pesquisa"},
+          {"input": "desculpa errei abra o navegador", "expected": ""}
+        ]
+      }
+    },
+    {
+      "id": "voice.interruption_detection",
+      "title": "Atlas stop-intent detection",
+      "domain": "voice",
+      "executor": "voice.interruption_detection",
+      "weight": 2.0,
+      "parameters": {
+        "samples": [
+          {"input": "Atlas pare", "expected": true, "cancel_execution": false},
+          {"input": "ruído anterior Atlas para", "expected": true, "cancel_execution": false},
+          {"input": "Athos pode parar", "expected": true, "cancel_execution": false},
+          {"input": "Atlas cancele a execução", "expected": true, "cancel_execution": true},
+          {"input": "pare", "expected": false},
+          {"input": "pare", "expected": true, "allow_without_wake": true},
+          {"input": "Atlas continue falando", "expected": false},
+          {"input": "vamos falar sobre o Atlas amanhã", "expected": false}
+        ]
+      }
+    },
+    {
+      "id": "voice.session_cycle",
+      "title": "Voice session and latency telemetry",
+      "domain": "voice",
+      "executor": "voice.session_cycle",
+      "weight": 1.5
+    },
+    {
+      "id": "voice.response_chunking",
+      "title": "TTS response chunking",
+      "domain": "voice",
+      "executor": "voice.response_chunking",
+      "weight": 1.0,
+      "parameters": {
+        "max_chars": 80
+      }
+    },
+    {
+      "id": "voice.neural_synthesis",
+      "title": "Live Edge neural TTS synthesis",
+      "domain": "voice",
+      "executor": "voice.neural_synthesis",
+      "weight": 2.0,
+      "tags": [
+        "live",
+        "edge-tts",
+        "latency"
+      ],
+      "parameters": {
+        "text": "Atlas benchmark de voz neural concluído."
+      }
+    }
+  ]
+}

@@ -1,0 +1,173 @@
+{
+  "id": "business_foundation",
+  "title": "Sprint 27 - Business Simulation Engine",
+  "kind": "business_simulation",
+  "description": "Transparent expected-value business simulation foundation for later School, Help Desk, Retail and Office labs.",
+  "tags": [
+    "sprint27",
+    "business",
+    "simulation",
+    "roi",
+    "frontend-ready"
+  ],
+  "metadata": {
+    "stage": 7,
+    "synthetic": true,
+    "commercial_guarantee": false,
+    "frontend_schema": "1.0",
+    "destructive_actions": false
+  },
+  "cases": [
+    {
+      "id": "business.model_contract",
+      "title": "Business simulation assumptions contract",
+      "domain": "business",
+      "executor": "business.model_contract",
+      "weight": 1.5,
+      "parameters": {
+        "scenario": {
+          "scenario_id": "foundation.operations",
+          "title": "Synthetic Operations Foundation",
+          "volume_per_period": 1000,
+          "staff_count": 5,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 20,
+          "manual_minutes_per_item": 6,
+          "atlas_seconds_per_automated_item": 15,
+          "automation_rate_pct": 75,
+          "human_review_minutes_per_automated_item": 0.5,
+          "manual_error_rate_pct": 4,
+          "atlas_error_rate_pct": 1,
+          "rework_minutes_per_error": 5,
+          "atlas_time_source": "synthetic_assumption"
+        }
+      }
+    },
+    {
+      "id": "business.baseline_vs_atlas",
+      "title": "Manual versus Atlas-assisted baseline",
+      "domain": "business",
+      "executor": "business.baseline_vs_atlas",
+      "weight": 2.0,
+      "parameters": {
+        "scenario": {
+          "scenario_id": "foundation.baseline",
+          "title": "Synthetic Baseline Comparison",
+          "volume_per_period": 1000,
+          "staff_count": 5,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 20,
+          "manual_minutes_per_item": 6,
+          "atlas_seconds_per_automated_item": 15,
+          "automation_rate_pct": 75,
+          "human_review_minutes_per_automated_item": 0.5,
+          "manual_error_rate_pct": 4,
+          "atlas_error_rate_pct": 1,
+          "rework_minutes_per_error": 5,
+          "atlas_time_source": "synthetic_assumption"
+        }
+      }
+    },
+    {
+      "id": "business.error_rework",
+      "title": "Expected error and rework model",
+      "domain": "business",
+      "executor": "business.error_rework",
+      "weight": 1.25,
+      "parameters": {
+        "scenario": {
+          "scenario_id": "foundation.rework",
+          "title": "Synthetic Rework Comparison",
+          "volume_per_period": 1200,
+          "staff_count": 5,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 20,
+          "manual_minutes_per_item": 5,
+          "atlas_seconds_per_automated_item": 12,
+          "automation_rate_pct": 70,
+          "human_review_minutes_per_automated_item": 0.75,
+          "manual_error_rate_pct": 5,
+          "atlas_error_rate_pct": 1.5,
+          "rework_minutes_per_error": 7,
+          "atlas_time_source": "synthetic_assumption"
+        }
+      }
+    },
+    {
+      "id": "business.capacity_projection",
+      "title": "Human capacity projection",
+      "domain": "business",
+      "executor": "business.capacity_projection",
+      "weight": 1.5,
+      "parameters": {
+        "scenario": {
+          "scenario_id": "foundation.capacity",
+          "title": "Synthetic Capacity Projection",
+          "volume_per_period": 2000,
+          "staff_count": 5,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 20,
+          "manual_minutes_per_item": 4.5,
+          "atlas_seconds_per_automated_item": 10,
+          "automation_rate_pct": 80,
+          "human_review_minutes_per_automated_item": 0.5,
+          "manual_error_rate_pct": 3,
+          "atlas_error_rate_pct": 1,
+          "rework_minutes_per_error": 5,
+          "atlas_time_source": "synthetic_assumption"
+        }
+      }
+    },
+    {
+      "id": "business.scale_consistency",
+      "title": "Scale consistency at 100, 500 and 2000 operations",
+      "domain": "business",
+      "executor": "business.scale_consistency",
+      "weight": 1.5,
+      "parameters": {
+        "volumes": [100, 500, 2000],
+        "scenario": {
+          "scenario_id": "foundation.scale",
+          "title": "Synthetic Scale Consistency",
+          "volume_per_period": 100,
+          "staff_count": 5,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 20,
+          "manual_minutes_per_item": 6,
+          "atlas_seconds_per_automated_item": 15,
+          "automation_rate_pct": 75,
+          "human_review_minutes_per_automated_item": 0.5,
+          "manual_error_rate_pct": 4,
+          "atlas_error_rate_pct": 1,
+          "rework_minutes_per_error": 5,
+          "atlas_time_source": "synthetic_assumption"
+        }
+      }
+    },
+    {
+      "id": "business.frontend_contract",
+      "title": "Mini frontend dashboard data contract",
+      "domain": "business",
+      "executor": "business.frontend_contract",
+      "weight": 1.5,
+      "parameters": {
+        "scenario": {
+          "scenario_id": "foundation.frontend",
+          "title": "Synthetic Dashboard Preview",
+          "volume_per_period": 1000,
+          "staff_count": 5,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 20,
+          "manual_minutes_per_item": 6,
+          "atlas_seconds_per_automated_item": 15,
+          "automation_rate_pct": 75,
+          "human_review_minutes_per_automated_item": 0.5,
+          "manual_error_rate_pct": 4,
+          "atlas_error_rate_pct": 1,
+          "rework_minutes_per_error": 5,
+          "atlas_time_source": "synthetic_assumption"
+        }
+      }
+    }
+  ]
+}

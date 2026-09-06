@@ -2,7 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/Plataforma-Windows-0078D4?logo=windows)
-![Tests](https://img.shields.io/badge/Testes-1506-16A34A)
+![Tests](https://img.shields.io/badge/Testes-994-16A34A)
 ![Code style](https://img.shields.io/badge/Qualidade-Ruff-D7FF64?logo=ruff&logoColor=black)
 ![License](https://img.shields.io/badge/Licen%C3%A7a-Propriet%C3%A1ria-111827)
 
@@ -42,7 +42,7 @@ com foco em privacidade, confiabilidade e evolução para cenários empresariais
 - Atlas Vision estruturado em 16 etapas, com DOM/UIA, confirmação supervisionada,
   recuperação limitada e auditoria redigida;
 - Validation Lab com benchmarks p50/p95, CPU/RAM e quality gates;
-- 1506 testes automatizados e validação estática com Ruff.
+- 994 testes automatizados e validação estática com Ruff.
 
 ## Arquitetura
 
@@ -293,7 +293,7 @@ Consulte [SECURITY.md](SECURITY.md) antes de publicar alterações.
 - [x] provisionamento Windows seguro e reversível;
 - [x] agentes consultivos de programação, radiologia, atacado e indústria;
 - [x] Atlas Vision estruturado — Etapas 1–16;
-- [x] painel de administração corporativo;
+- [ ] painel de administração corporativo;
 - [ ] adaptadores reais para CRM, e-mail e calendário.
 
 ## Autor

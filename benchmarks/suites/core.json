@@ -1,0 +1,105 @@
+{
+  "id": "core",
+  "title": "Sprint 27 - Atlas Core Benchmark",
+  "kind": "technical",
+  "description": "Core readiness, routing, lazy loading, local hardware profile and optional live Ollama probes.",
+  "tags": [
+    "sprint27",
+    "core",
+    "technical"
+  ],
+  "metadata": {
+    "stage": 3,
+    "synthetic": false,
+    "live_optional": true
+  },
+  "cases": [
+    {
+      "id": "core.imports",
+      "title": "Critical module imports",
+      "domain": "core",
+      "executor": "core.imports",
+      "weight": 1.5,
+      "parameters": {
+        "modules": [
+          "atlas.core.lazy",
+          "atlas.core.runtime_profile",
+          "atlas.core.resource_manager",
+          "atlas.brain.model_router",
+          "atlas.utils.text"
+        ]
+      }
+    },
+    {
+      "id": "core.text_pipeline",
+      "title": "Text normalization and wake-word pipeline",
+      "domain": "core",
+      "executor": "core.text_pipeline",
+      "weight": 1.0,
+      "parameters": {
+        "samples": [
+          {
+            "input": "  OLÁ, Atlas!!!  ",
+            "expected": "ola atlas"
+          },
+          {
+            "input": "Atlas, abra o navegador",
+            "wake_word": "Atlas",
+            "remove_wake": true,
+            "expected": "abra o navegador"
+          },
+          {
+            "input": "Por favor Atlas, diga olá",
+            "wake_word": "Atlas",
+            "remove_wake": true,
+            "expected": "diga ola"
+          }
+        ]
+      }
+    },
+    {
+      "id": "core.lazy_loading",
+      "title": "Lazy component single-load semantics",
+      "domain": "core",
+      "executor": "core.lazy_loading",
+      "weight": 1.0
+    },
+    {
+      "id": "core.runtime_profile",
+      "title": "Runtime profile on current hardware",
+      "domain": "core",
+      "executor": "core.runtime_profile",
+      "weight": 1.5,
+      "parameters": {
+        "requested": "auto"
+      }
+    },
+    {
+      "id": "core.model_router",
+      "title": "Deterministic model classification and routing",
+      "domain": "core",
+      "executor": "core.model_router",
+      "weight": 1.5
+    },
+    {
+      "id": "core.ollama_health",
+      "title": "Live Ollama and configured model readiness",
+      "domain": "core",
+      "executor": "core.ollama_health",
+      "weight": 2.0,
+      "tags": ["live", "ollama"]
+    },
+    {
+      "id": "core.ollama_chat",
+      "title": "Live Ollama deterministic response probe",
+      "domain": "core",
+      "executor": "core.ollama_chat",
+      "weight": 2.5,
+      "tags": ["live", "ollama", "latency"],
+      "parameters": {
+        "prompt": "Responda somente com ATLAS_OK, sem explicações adicionais.",
+        "expected_token": "ATLAS_OK"
+      }
+    }
+  ]
+}

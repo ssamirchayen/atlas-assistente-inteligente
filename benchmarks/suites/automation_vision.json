@@ -1,0 +1,171 @@
+{
+  "id": "automation_vision",
+  "title": "Sprint 27 - Automation + Vision Benchmark",
+  "kind": "technical",
+  "description": "Safe automation routing, isolated filesystem execution, Vision intent safety, grounding, post-action verification, capture and optional live local Vision analysis.",
+  "tags": [
+    "sprint27",
+    "automation",
+    "vision",
+    "technical"
+  ],
+  "metadata": {
+    "stage": 5,
+    "synthetic": false,
+    "live_optional": true,
+    "destructive_actions": false,
+    "live_vision_read_only": true
+  },
+  "cases": [
+    {
+      "id": "automation.url_intent",
+      "title": "Direct URL routing accuracy",
+      "domain": "automation",
+      "executor": "automation.url_intent",
+      "weight": 1.0,
+      "parameters": {
+        "samples": [
+          {
+            "input": "abra https://example.com/path?q=1",
+            "expected_url": "https://example.com/path?q=1"
+          },
+          {
+            "input": "acesse http://127.0.0.1:8765/tools/lab.html",
+            "expected_url": "http://127.0.0.1:8765/tools/lab.html"
+          },
+          {
+            "input": "abra https://example.com e depois clique",
+            "expected_url": null
+          },
+          {
+            "input": "pesquise https://example.com",
+            "expected_url": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "automation.domain_generators",
+      "title": "Safe domain automation generators",
+      "domain": "automation",
+      "executor": "automation.domain_generators",
+      "weight": 1.0
+    },
+    {
+      "id": "automation.file_sandbox",
+      "title": "Scratch-only automation workflow",
+      "domain": "automation",
+      "executor": "automation.file_sandbox",
+      "weight": 1.75,
+      "tags": [
+        "filesystem",
+        "sandbox"
+      ]
+    },
+    {
+      "id": "automation.engine_contract",
+      "title": "Live AutomationEngine failure contract",
+      "domain": "automation",
+      "executor": "automation.engine_contract",
+      "weight": 1.25,
+      "tags": [
+        "live",
+        "engine",
+        "contract"
+      ]
+    },
+    {
+      "id": "vision.intent_routes",
+      "title": "Vision route classification",
+      "domain": "vision",
+      "executor": "vision.intent_routes",
+      "weight": 1.25,
+      "parameters": {
+        "samples": [
+          {
+            "input": "O que você está vendo na tela?",
+            "route": "read_only"
+          },
+          {
+            "input": "Tem algum erro nessa tela?",
+            "route": "read_only"
+          },
+          {
+            "input": "clique no botão enviar",
+            "route": "click",
+            "value": "botão enviar"
+          },
+          {
+            "input": "onde está o botão enviar",
+            "route": "grounding",
+            "value": "botao enviar"
+          },
+          {
+            "input": "clique duas vezes no botão enviar",
+            "route": "none"
+          },
+          {
+            "input": "abra o Google",
+            "route": "none"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vision.structured_intents",
+      "title": "Structured UI intent safety",
+      "domain": "vision",
+      "executor": "vision.structured_intents",
+      "weight": 1.5
+    },
+    {
+      "id": "vision.synthetic_grounding",
+      "title": "Synthetic visual grounding",
+      "domain": "vision",
+      "executor": "vision.synthetic_grounding",
+      "weight": 1.5
+    },
+    {
+      "id": "vision.post_action",
+      "title": "Post-action verification contract",
+      "domain": "vision",
+      "executor": "vision.post_action",
+      "weight": 1.5
+    },
+    {
+      "id": "vision.synthetic_capture",
+      "title": "Synthetic capture pipeline",
+      "domain": "vision",
+      "executor": "vision.synthetic_capture",
+      "weight": 1.0
+    },
+    {
+      "id": "vision.live_capture",
+      "title": "Live read-only screen capture",
+      "domain": "vision",
+      "executor": "vision.live_capture",
+      "weight": 1.5,
+      "tags": [
+        "live",
+        "screen",
+        "latency"
+      ]
+    },
+    {
+      "id": "vision.live_analysis",
+      "title": "Live local multimodal analysis",
+      "domain": "vision",
+      "executor": "vision.live_analysis",
+      "weight": 2.0,
+      "tags": [
+        "live",
+        "ollama",
+        "vision",
+        "latency"
+      ],
+      "parameters": {
+        "question": "Descreva objetivamente a estrutura geral da tela para um benchmark técnico."
+      }
+    }
+  ]
+}

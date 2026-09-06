@@ -1,0 +1,106 @@
+{
+  "id": "memory_stress",
+  "title": "Sprint 27 - Memory + Stress Benchmark",
+  "kind": "technical",
+  "description": "Scratch-only memory correctness, persistence, concurrency and scaling benchmark with 10/50/100/500 operation workloads.",
+  "tags": [
+    "sprint27",
+    "memory",
+    "stress",
+    "persistence",
+    "technical"
+  ],
+  "metadata": {
+    "stage": 6,
+    "synthetic": false,
+    "sandbox_only": true,
+    "semantic_embeddings": false,
+    "destructive_actions": false
+  },
+  "cases": [
+    {
+      "id": "memory.crud_contract",
+      "title": "Memory CRUD lifecycle",
+      "domain": "memory",
+      "executor": "memory.crud_contract",
+      "weight": 1.25
+    },
+    {
+      "id": "memory.persistence",
+      "title": "Memory persistence after reopen",
+      "domain": "memory",
+      "executor": "memory.persistence",
+      "weight": 1.5,
+      "parameters": {
+        "records": 25
+      }
+    },
+    {
+      "id": "memory.keyed_upsert",
+      "title": "Keyed memory create/update stability",
+      "domain": "memory",
+      "executor": "memory.keyed_upsert",
+      "weight": 1.25
+    },
+    {
+      "id": "memory.search_accuracy",
+      "title": "Lexical memory retrieval accuracy",
+      "domain": "memory",
+      "executor": "memory.search_accuracy",
+      "weight": 1.5,
+      "parameters": {
+        "targets": 12,
+        "decoys": 24
+      }
+    },
+    {
+      "id": "memory.concurrent_writes",
+      "title": "Concurrent memory writes",
+      "domain": "memory",
+      "executor": "memory.concurrent_writes",
+      "weight": 1.5,
+      "parameters": {
+        "records": 100,
+        "workers": 4
+      }
+    },
+    {
+      "id": "stress.write_scaling",
+      "title": "Memory write scaling",
+      "domain": "stress",
+      "executor": "stress.write_scaling",
+      "weight": 2.0,
+      "tags": [
+        "10",
+        "50",
+        "100",
+        "500"
+      ],
+      "parameters": {
+        "batch_sizes": [10, 50, 100, 500]
+      }
+    },
+    {
+      "id": "stress.search_scaling",
+      "title": "Memory search scaling",
+      "domain": "stress",
+      "executor": "stress.search_scaling",
+      "weight": 2.0,
+      "parameters": {
+        "dataset_sizes": [10, 100, 500],
+        "queries_per_size": 20
+      }
+    },
+    {
+      "id": "stress.reopen_cycles",
+      "title": "Repeated persistence/restart cycles",
+      "domain": "stress",
+      "executor": "stress.reopen_cycles",
+      "weight": 1.5,
+      "parameters": {
+        "records": 100,
+        "cycles": 5
+      }
+    }
+  ]
+}

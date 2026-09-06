@@ -1,0 +1,298 @@
+{
+  "id": "retail_office",
+  "title": "Sprint 27 - Retail + Office Simulation",
+  "kind": "business_simulation",
+  "description": "Synthetic retail back-office and administrative office workload simulations comparing manual operations with Atlas-assisted handling.",
+  "tags": ["sprint27", "retail", "office", "business-simulation", "frontend-ready"],
+  "metadata": {
+    "stage": 10,
+    "synthetic": true,
+    "commercial_guarantee": false,
+    "frontend_schema": "1.0",
+    "destructive_actions": false,
+    "personal_data": false
+  },
+  "cases": [
+    {
+      "id": "retail.event_generation",
+      "title": "Generate privacy-safe synthetic retail events",
+      "domain": "retail",
+      "executor": "retail.event_generation",
+      "weight": 1.0,
+      "parameters": {
+        "sample_count": 3000,
+        "scenario": {
+          "scenario_id": "retail.synthetic",
+          "title": "Synthetic Retail Back Office",
+          "operations_per_period": 3000,
+          "staff_count": 6,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 22,
+          "categories": ["stock_check", "price_divergence", "supplier_order", "sales_report"],
+          "automation_rate_pct": 68,
+          "manual_minutes_per_operation": 4.5,
+          "atlas_seconds_per_automated_operation": 20,
+          "human_review_minutes_per_automated_operation": 0.8,
+          "manual_error_rate_pct": 4.5,
+          "atlas_error_rate_pct": 1.2,
+          "rework_minutes_per_error": 8,
+          "manual_exception_minutes": 16,
+          "atlas_exception_seconds": 18,
+          "high_priority_pct": 18
+        }
+      }
+    },
+    {
+      "id": "retail.baseline_vs_atlas",
+      "title": "Manual versus Atlas-assisted retail workload",
+      "domain": "retail",
+      "executor": "retail.baseline_vs_atlas",
+      "weight": 2.0,
+      "parameters": {
+        "scenario": {
+          "scenario_id": "retail.baseline.synthetic",
+          "title": "Synthetic Retail Baseline",
+          "operations_per_period": 3000,
+          "staff_count": 6,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 22,
+          "automation_rate_pct": 68,
+          "manual_minutes_per_operation": 4.5,
+          "atlas_seconds_per_automated_operation": 20,
+          "human_review_minutes_per_automated_operation": 0.8,
+          "manual_error_rate_pct": 4.5,
+          "atlas_error_rate_pct": 1.2,
+          "rework_minutes_per_error": 8,
+          "manual_exception_minutes": 16,
+          "atlas_exception_seconds": 18,
+          "high_priority_pct": 18
+        }
+      }
+    },
+    {
+      "id": "retail.exception_response",
+      "title": "Retail exception response projection",
+      "domain": "retail",
+      "executor": "retail.exception_response",
+      "weight": 1.5,
+      "parameters": {
+        "scenario": {
+          "scenario_id": "retail.exceptions.synthetic",
+          "title": "Synthetic Retail Exceptions",
+          "operations_per_period": 3000,
+          "staff_count": 6,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 22,
+          "automation_rate_pct": 68,
+          "manual_minutes_per_operation": 4.5,
+          "atlas_seconds_per_automated_operation": 20,
+          "human_review_minutes_per_automated_operation": 0.8,
+          "manual_error_rate_pct": 4.5,
+          "atlas_error_rate_pct": 1.2,
+          "rework_minutes_per_error": 8,
+          "manual_exception_minutes": 16,
+          "atlas_exception_seconds": 18,
+          "high_priority_pct": 18
+        }
+      }
+    },
+    {
+      "id": "retail.scale",
+      "title": "Retail Lab scale at 250, 1000 and 3000 operations",
+      "domain": "retail",
+      "executor": "retail.scale",
+      "weight": 1.0,
+      "parameters": {
+        "volumes": [250, 1000, 3000],
+        "scenario": {
+          "scenario_id": "retail.scale.synthetic",
+          "title": "Synthetic Retail Scale",
+          "operations_per_period": 3000,
+          "staff_count": 6,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 22,
+          "automation_rate_pct": 68,
+          "manual_minutes_per_operation": 4.5,
+          "atlas_seconds_per_automated_operation": 20,
+          "human_review_minutes_per_automated_operation": 0.8,
+          "manual_error_rate_pct": 4.5,
+          "atlas_error_rate_pct": 1.2,
+          "rework_minutes_per_error": 8,
+          "manual_exception_minutes": 16,
+          "atlas_exception_seconds": 18,
+          "high_priority_pct": 18
+        }
+      }
+    },
+    {
+      "id": "retail.frontend_contract",
+      "title": "Retail mini frontend payload contract",
+      "domain": "retail",
+      "executor": "retail.frontend_contract",
+      "weight": 1.25,
+      "parameters": {
+        "scenario": {
+          "scenario_id": "retail.frontend.synthetic",
+          "title": "Synthetic Retail Dashboard",
+          "operations_per_period": 3000,
+          "staff_count": 6,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 22,
+          "automation_rate_pct": 68,
+          "manual_minutes_per_operation": 4.5,
+          "atlas_seconds_per_automated_operation": 20,
+          "human_review_minutes_per_automated_operation": 0.8,
+          "manual_error_rate_pct": 4.5,
+          "atlas_error_rate_pct": 1.2,
+          "rework_minutes_per_error": 8,
+          "manual_exception_minutes": 16,
+          "atlas_exception_seconds": 18,
+          "high_priority_pct": 18
+        }
+      }
+    },
+    {
+      "id": "office.task_generation",
+      "title": "Generate privacy-safe synthetic office tasks",
+      "domain": "office",
+      "executor": "office.task_generation",
+      "weight": 1.0,
+      "parameters": {
+        "sample_count": 1800,
+        "scenario": {
+          "scenario_id": "office.synthetic",
+          "title": "Synthetic Administrative Office",
+          "tasks_per_period": 1800,
+          "staff_count": 5,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 26,
+          "categories": ["email", "report", "spreadsheet", "scheduling", "file_organization"],
+          "automation_rate_pct": 72,
+          "manual_minutes_per_task": 7.5,
+          "atlas_seconds_per_automated_task": 25,
+          "human_review_minutes_per_automated_task": 1,
+          "manual_error_rate_pct": 5,
+          "atlas_error_rate_pct": 1,
+          "rework_minutes_per_error": 10,
+          "manual_first_action_minutes": 55,
+          "atlas_first_action_seconds": 12,
+          "manual_on_time_pct": 86,
+          "atlas_automated_on_time_pct": 99
+        }
+      }
+    },
+    {
+      "id": "office.baseline_vs_atlas",
+      "title": "Manual versus Atlas-assisted office workload",
+      "domain": "office",
+      "executor": "office.baseline_vs_atlas",
+      "weight": 2.0,
+      "parameters": {
+        "scenario": {
+          "scenario_id": "office.baseline.synthetic",
+          "title": "Synthetic Office Baseline",
+          "tasks_per_period": 1800,
+          "staff_count": 5,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 26,
+          "automation_rate_pct": 72,
+          "manual_minutes_per_task": 7.5,
+          "atlas_seconds_per_automated_task": 25,
+          "human_review_minutes_per_automated_task": 1,
+          "manual_error_rate_pct": 5,
+          "atlas_error_rate_pct": 1,
+          "rework_minutes_per_error": 10,
+          "manual_first_action_minutes": 55,
+          "atlas_first_action_seconds": 12,
+          "manual_on_time_pct": 86,
+          "atlas_automated_on_time_pct": 99
+        }
+      }
+    },
+    {
+      "id": "office.turnaround",
+      "title": "Office turnaround and deadline projection",
+      "domain": "office",
+      "executor": "office.turnaround",
+      "weight": 1.5,
+      "parameters": {
+        "scenario": {
+          "scenario_id": "office.turnaround.synthetic",
+          "title": "Synthetic Office Turnaround",
+          "tasks_per_period": 1800,
+          "staff_count": 5,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 26,
+          "automation_rate_pct": 72,
+          "manual_minutes_per_task": 7.5,
+          "atlas_seconds_per_automated_task": 25,
+          "human_review_minutes_per_automated_task": 1,
+          "manual_error_rate_pct": 5,
+          "atlas_error_rate_pct": 1,
+          "rework_minutes_per_error": 10,
+          "manual_first_action_minutes": 55,
+          "atlas_first_action_seconds": 12,
+          "manual_on_time_pct": 86,
+          "atlas_automated_on_time_pct": 99
+        }
+      }
+    },
+    {
+      "id": "office.scale",
+      "title": "Office Lab scale at 200, 800 and 1800 tasks",
+      "domain": "office",
+      "executor": "office.scale",
+      "weight": 1.0,
+      "parameters": {
+        "volumes": [200, 800, 1800],
+        "scenario": {
+          "scenario_id": "office.scale.synthetic",
+          "title": "Synthetic Office Scale",
+          "tasks_per_period": 1800,
+          "staff_count": 5,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 26,
+          "automation_rate_pct": 72,
+          "manual_minutes_per_task": 7.5,
+          "atlas_seconds_per_automated_task": 25,
+          "human_review_minutes_per_automated_task": 1,
+          "manual_error_rate_pct": 5,
+          "atlas_error_rate_pct": 1,
+          "rework_minutes_per_error": 10,
+          "manual_first_action_minutes": 55,
+          "atlas_first_action_seconds": 12,
+          "manual_on_time_pct": 86,
+          "atlas_automated_on_time_pct": 99
+        }
+      }
+    },
+    {
+      "id": "office.frontend_contract",
+      "title": "Office mini frontend payload contract",
+      "domain": "office",
+      "executor": "office.frontend_contract",
+      "weight": 1.25,
+      "parameters": {
+        "scenario": {
+          "scenario_id": "office.frontend.synthetic",
+          "title": "Synthetic Office Dashboard",
+          "tasks_per_period": 1800,
+          "staff_count": 5,
+          "work_hours_per_staff": 176,
+          "hourly_cost_brl": 26,
+          "automation_rate_pct": 72,
+          "manual_minutes_per_task": 7.5,
+          "atlas_seconds_per_automated_task": 25,
+          "human_review_minutes_per_automated_task": 1,
+          "manual_error_rate_pct": 5,
+          "atlas_error_rate_pct": 1,
+          "rework_minutes_per_error": 10,
+          "manual_first_action_minutes": 55,
+          "atlas_first_action_seconds": 12,
+          "manual_on_time_pct": 86,
+          "atlas_automated_on_time_pct": 99
+        }
+      }
+    }
+  ]
+}
