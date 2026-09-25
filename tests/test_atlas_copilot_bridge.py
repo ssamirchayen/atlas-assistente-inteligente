@@ -141,7 +141,8 @@ def test_bridge_creates_interaction_through_integration_manager() -> None:
     assert manager.calls[0][2]["code"] == "SIM-00005"
 
 
-def test_local_api_health_and_message_endpoint() -> None:
+def test_local_api_health_and_message_endpoint(monkeypatch) -> None:
+    monkeypatch.setenv("ATLAS_COPILOT_TOKEN", "different-environment-test-token")
     def handler(payload: dict[str, Any]) -> CopilotResponse:
         assert payload["message"] == "teste"
         return CopilotResponse(ok=True, answer="ok", intent="test")
@@ -150,7 +151,7 @@ def test_local_api_health_and_message_endpoint() -> None:
         host="127.0.0.1",
         port=0,
         copilot_handler=handler,
-        api_token="",
+        api_token="copilot-test-token-local-only",
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -165,7 +166,10 @@ def test_local_api_health_and_message_endpoint() -> None:
         request = Request(
             f"{base_url}/api/copilot/message",
             data=body,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-Atlas-Copilot-Token": "copilot-test-token-local-only",
+            },
             method="POST",
         )
         with urlopen(request, timeout=2) as response:

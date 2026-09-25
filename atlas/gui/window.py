@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import html
+import logging
+import os
 import threading
 from concurrent.futures import Future
 from datetime import datetime
@@ -23,6 +25,8 @@ from PySide6.QtWidgets import (
 )
 
 from atlas.core.config import ATLAS_NAME, USER_NAME
+from atlas.copilot.local_api import create_copilot_server
+from atlas.copilot.nexyra_bridge import NexyraCopilotBridge
 from atlas.admin.service import AdminConsoleService
 from atlas.gui.admin_console import AdminConsoleDialog
 from atlas.gui.orb import AtlasOrb
@@ -47,6 +51,9 @@ from atlas.voice.session import VoiceSnapshot, VoiceState
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QCloseEvent
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class AtlasSignals(QObject):
@@ -104,6 +111,8 @@ class AtlasWindow(QMainWindow):
         self._resume_available = False
         self.vision_overlay = VisionOverlayWindow()
         self.admin_console: AdminConsoleDialog | None = None
+        self._copilot_server = None
+        self._copilot_thread: threading.Thread | None = None
 
         self._connect_signals()
         self._configure_window()
@@ -111,6 +120,7 @@ class AtlasWindow(QMainWindow):
         self.voice_session.subscribe(self._on_voice_state_changed)
         self._start_system_monitor()
         self.service.start()
+        self._start_nexyra_copilot_bridge()
         self._refresh_resumption_state()
         self._ensure_interruption_monitor()
 
@@ -1248,6 +1258,71 @@ class AtlasWindow(QMainWindow):
         scrollbar = self.chat.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
+    def _start_nexyra_copilot_bridge(self) -> None:
+        raw_enabled = os.getenv("ATLAS_COPILOT_ENABLED")
+        enabled = (
+            raw_enabled.strip().lower() not in {"0", "false", "no", "off"}
+            if raw_enabled is not None
+            else bool(os.getenv("ATLAS_NEXYRA_URL"))
+        )
+        if not enabled:
+            return
+
+        host = os.getenv("ATLAS_COPILOT_HOST", "127.0.0.1")
+        try:
+            port = int(os.getenv("ATLAS_COPILOT_PORT", "8766"))
+            timeout = float(os.getenv("ATLAS_COPILOT_TIMEOUT_SECONDS", "45"))
+        except ValueError:
+            _LOGGER.warning("Configuração inválida do Atlas Copilot Bridge.")
+            return
+
+        bridge = NexyraCopilotBridge(
+            self.command_runner.submit,
+            timeout_seconds=timeout,
+        )
+        try:
+            server = create_copilot_server(
+                host=host,
+                port=port,
+                copilot_handler=bridge.handle,
+                allowed_origin=os.getenv(
+                    "ATLAS_COPILOT_ALLOWED_ORIGIN",
+                    "http://127.0.0.1:5173",
+                ),
+                api_token=os.getenv("ATLAS_COPILOT_TOKEN", ""),
+            )
+        except OSError as exc:
+            _LOGGER.warning("Atlas Copilot Bridge indisponível: %s", exc)
+            return
+
+        self._copilot_server = server
+        self._copilot_thread = threading.Thread(
+            target=server.serve_forever,
+            name="atlas-nexyra-copilot",
+            daemon=True,
+        )
+        self._copilot_thread.start()
+        _LOGGER.info(
+            "Atlas Copilot Bridge ativo em http://%s:%s",
+            host,
+            port,
+        )
+
+    def _stop_nexyra_copilot_bridge(self) -> None:
+        server = self._copilot_server
+        if server is None:
+            return
+        self._copilot_server = None
+        try:
+            server.shutdown()
+            server.server_close()
+        except OSError:
+            _LOGGER.exception("Falha ao encerrar Atlas Copilot Bridge.")
+        thread = self._copilot_thread
+        self._copilot_thread = None
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=2.0)
+
     def closeEvent(self, event: QCloseEvent) -> None:
         if self.admin_console is not None:
             self.admin_console.close()
@@ -1258,6 +1333,7 @@ class AtlasWindow(QMainWindow):
         self.interruption_monitor.stop(wait=True, timeout=2.0)
         self.voice_session.unsubscribe(self._on_voice_state_changed)
         self.speech.disable_microphone()
+        self._stop_nexyra_copilot_bridge()
         self.command_runner.close(cleanup=self.service.close)
         event.accept()
 

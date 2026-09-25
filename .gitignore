@@ -35,3 +35,65 @@ ruff_erros.txt
 .idea/
 .DS_Store
 Thumbs.db
+
+# Ambientes e dependencias
+.venv*/
+venv/
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Segredos e configuracoes locais
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# Dados e artefatos locais
+data/
+logs/
+backups/
+uploads/
+*.db
+*.db-*
+*.sqlite*
+*.dump
+*.log
+*.zip
+build/
+dist/
+
+# Ambientes e dependencias
+.venv*/
+venv/
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Segredos e configuracoes locais
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# Dados e artefatos locais
+data/
+logs/
+backups/
+uploads/
+*.db
+*.db-*
+*.sqlite*
+*.dump
+*.log
+*.zip
+build/
+dist/

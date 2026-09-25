@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .business_lab import BusinessLabCopilotBridge
 from .local_api import create_copilot_server, run_copilot_server
+from .nexyra_bridge import NexyraCopilotBridge
 from .models import (
     CopilotActionResult,
     CopilotPageContext,
@@ -17,4 +18,5 @@ __all__ = [
     "CopilotResponse",
     "create_copilot_server",
     "run_copilot_server",
+    "NexyraCopilotBridge",
 ]

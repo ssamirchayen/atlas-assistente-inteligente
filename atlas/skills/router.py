@@ -25,14 +25,47 @@ class SkillRouter:
         memory_lifecycle: MemoryLifecycleManager | None = None,
     ) -> None:
         self.memory = memory
-        self.memory_lifecycle = (
-            memory_lifecycle or MemoryLifecycleManager(memory)
-        )
+        self.memory_lifecycle = memory_lifecycle or MemoryLifecycleManager(memory)
         self.pending_system_action: tuple[str, int] | None = None
+        self.pending_nexyra_action = None
         self.pending_open = False
 
     def route_priority(self, raw_text: str) -> SkillResult:
-        """Trata comandos de memória antes que cheguem ao Planner."""
+        """Trata confirmações, memória e Nexyra antes do Planner."""
+
+        # A GUI e o loop principal consultam route_priority() antes do Planner.
+        # Por isso uma confirmação Nexyra precisa ser interceptada aqui, não só
+        # em route(), para que "sim"/"não" nunca caiam em outra camada.
+        if self.pending_nexyra_action is not None:
+            confirmation = self._confirmation(clean_politeness(raw_text))
+            if confirmation.handled:
+                return confirmation
+
+        from atlas.integrations.nexyra_crm.commands import (
+            format_action_preview,
+            prepare_action,
+        )
+        from atlas.integrations.nexyra_crm.client import NexyraError
+
+        try:
+            pending = prepare_action(raw_text)
+        except NexyraError as exc:
+            return SkillResult(True, f"Não consegui preparar a ação Nexyra. {exc}")
+
+        if pending is not None:
+            self.pending_nexyra_action = pending
+            return SkillResult(
+                True,
+                format_action_preview(pending),
+                needs_followup=True,
+                followup_type="nexyra_confirmation",
+            )
+
+        from atlas.integrations.nexyra_crm.commands import handle_command
+
+        nexyra_message = handle_command(raw_text)
+        if nexyra_message is not None:
+            return SkillResult(True, nexyra_message)
 
         text = clean_politeness(raw_text)
         remember_match = re.match(
@@ -167,6 +200,53 @@ class SkillRouter:
         return SkillResult(False)
 
     def _confirmation(self, text: str) -> SkillResult:
+        if self.pending_nexyra_action is not None:
+            pending = self.pending_nexyra_action
+            if pending.is_expired():
+                self.pending_nexyra_action = None
+                return SkillResult(
+                    True,
+                    "A prévia Nexyra expirou após 2 minutos. Nada foi alterado. "
+                    "Solicite uma nova prévia.",
+                )
+
+            if text in {
+                "nao",
+                "cancelar",
+                "cancela",
+                "negativo",
+                "nexyra cancelar",
+                "cancelar nexyra",
+                "nexyra limpar",
+                "limpar nexyra",
+            }:
+                self.pending_nexyra_action = None
+                return SkillResult(True, "Ação Nexyra cancelada.")
+
+            if text not in {
+                "sim",
+                "confirmar",
+                "confirmo",
+                "pode",
+                "positivo",
+                "executar",
+            }:
+                return SkillResult(
+                    True,
+                    "A prévia Nexyra está aguardando confirmação. "
+                    "Responda sim para executar ou não para cancelar.",
+                    needs_followup=True,
+                    followup_type="nexyra_confirmation",
+                )
+
+            pending = self.pending_nexyra_action
+            # Remove o estado antes da chamada: falha de rede nunca cria uma
+            # repetição implícita de uma escrita cujo resultado é incerto.
+            self.pending_nexyra_action = None
+            from atlas.integrations.nexyra_crm.commands import execute_pending_action
+
+            return SkillResult(True, execute_pending_action(pending))
+
         if self.pending_system_action is None:
             return SkillResult(False)
 

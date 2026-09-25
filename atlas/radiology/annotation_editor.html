@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Atlas · Anotação de Radiologia</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b1725;color:#e5edf5;font:16px system-ui,sans-serif}
+header{padding:22px 28px;background:#11253a;border-bottom:1px solid #37516b}h1{font-size:25px;margin:0 0 8px}p{line-height:1.5}
+.notice{color:#ffda95;font-size:14px;margin:6px 0}main{padding:20px;max-width:1500px;margin:auto}
+.tools{display:flex;flex-wrap:wrap;gap:12px;align-items:end;background:#172b40;padding:16px;border-radius:10px}
+label{display:grid;gap:5px;font-size:13px}button,select,input{font:inherit;border:1px solid #60768c;border-radius:5px;padding:9px;background:#203951;color:white}button{cursor:pointer}button:hover{background:#2e5373}.primary{background:#11776e}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:18px;margin-top:18px}.viewport{overflow:auto;height:65vh;background:#03090e;border:1px solid #37516b}canvas{display:block;touch-action:none;cursor:crosshair}aside{background:#172b40;padding:14px;border-radius:8px;max-height:65vh;overflow:auto}aside h2{font-size:18px;margin-top:0}.entry{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #37516b}.entry button{padding:3px 8px}#status{min-height:26px;color:#91e6d3}input[type=file]{max-width:230px}.help{font-size:14px;color:#b6c7d7}button:focus-visible,select:focus-visible{outline:3px solid #7affdf}@media(max-width:800px){.layout{grid-template-columns:1fr}.viewport{height:55vh}aside{max-height:260px}}
+</style></head><body>
+<header><h1>Atlas Radiologia · Contornos e marcos</h1>
+<p class="notice">Pesquisa • Anotação manual, sem reconhecimento automático de ossos ou validação clínica.</p>
+<p class="notice">Este HTML contém imagens que podem identificar pessoas. Mantenha-o localmente.</p></header>
+<main><div class="tools">
+<label>Vista<select id="view"><option>AP</option><option>LATERAL</option><option>OBLIQUE</option></select></label>
+<label>Estrutura<select id="bone"><option value="femur_distal">Fêmur distal</option><option value="tibia">Tíbia</option><option value="fibula">Fíbula</option><option value="patella">Patela</option></select></label>
+<label>Ferramenta<select id="mode"><option value="polygon">Contorno</option><option value="point">Marco</option></select></label>
+<label>Marco<select id="label"><option>P1</option><option>P2</option><option>P3</option><option>P4</option></select></label>
+<label>Zoom<select id="zoom"><option value="0.5">50%</option><option value="1" selected>100%</option><option value="2">200%</option></select></label>
+<button id="close">Fechar contorno</button><button id="undo">Desfazer</button><button id="cancel">Cancelar contorno</button>
+<button id="save" class="primary">Baixar anotações JSON</button>
+<label>Retomar JSON<input id="load" type="file" accept="application/json,.json"></label>
+</div>
+<p class="help">Contorno: clique nos vértices e depois em “Fechar contorno”. Marco: escolha P1–P4 e clique; repetir o mesmo marco atualiza sua posição. Exclua um contorno e redesenhe para corrigir. Sem contorno significa “não anotado”.</p>
+<p class="help">Coordenadas da prévia de até 1600 pixels. P1–P4 são rótulos livres por estrutura; a correspondência anatômica entre vistas deve ser estabelecida pelo revisor.</p>
+<p id="status" role="status">Selecione uma estrutura e comece a marcar.</p>
+<div class="layout"><div class="viewport"><canvas id="canvas" aria-label="Imagem para anotação manual"></canvas></div><aside><h2>Anotações da vista</h2><div id="entries"></div></aside></div>
+</main><script>
+'use strict';
+const payload=__ANNOTATION_DATA__;
+let annotation=structuredClone(payload.annotation), draft=[], history=[], dirty=false;
+const $=id=>document.getElementById(id), canvas=$('canvas'), ctx=canvas.getContext('2d');
+const colors={femur_distal:'#ffcf5b',tibia:'#42e5ba',fibula:'#79b9ff',patella:'#ef92ff'};
+const pictures={};let ready=false;
+function status(text){$('status').textContent=text;}
+function current(){return annotation.views[$('view').value];}
+function remember(){history.push(JSON.stringify(annotation));if(history.length>100)history.shift();dirty=true;}
+function render(){
+ if(!ready)return;const v=current(),scale=Number($('zoom').value);
+ canvas.width=v.size[0];canvas.height=v.size[1];canvas.style.width=canvas.width*scale+'px';canvas.style.height=canvas.height*scale+'px';
+ ctx.drawImage(pictures[$('view').value],0,0);ctx.lineWidth=2/scale;
+ const polygon=(points,bone,closed)=>{ctx.strokeStyle=colors[bone];ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(...p):ctx.moveTo(...p));if(closed)ctx.closePath();ctx.stroke();if(closed){ctx.fillStyle=colors[bone]+'33';ctx.fill();}};
+ v.polygons.forEach(p=>polygon(p.points,p.bone,true));if(draft.length)polygon(draft,$('bone').value,false);
+ v.landmarks.forEach(p=>{ctx.fillStyle=colors[p.bone];ctx.beginPath();ctx.arc(...p.point,4/scale,0,2*Math.PI);ctx.fill();ctx.font=(14/scale)+'px sans-serif';ctx.fillText(p.label,p.point[0]+6/scale,p.point[1]-6/scale);});
+ const list=$('entries');list.replaceChildren();
+ for(const kind of ['polygons','landmarks'])v[kind].forEach((entry,index)=>{const row=document.createElement('div');row.className='entry';const text=document.createElement('span');text.textContent=entry.bone+' · '+(kind==='polygons'?'contorno '+(index+1):entry.label);const button=document.createElement('button');button.textContent='Excluir';button.onclick=()=>{remember();current()[kind].splice(index,1);render();};row.append(text,button);list.append(row);});
+}
+canvas.addEventListener('pointerdown',event=>{
+ if(!ready)return;const box=canvas.getBoundingClientRect();const p=[(event.clientX-box.left)*canvas.width/box.width,(event.clientY-box.top)*canvas.height/box.height].map(x=>Math.round(x*100)/100);
+ if(p[0]<0||p[1]<0||p[0]>=canvas.width||p[1]>=canvas.height)return;
+ if($('mode').value==='polygon'){if(draft.length>=200){status('Limite de 200 vértices por contorno.');return;}draft.push(p);dirty=true;}
+ else{remember();const v=current(),bone=$('bone').value,label=$('label').value;v.landmarks=v.landmarks.filter(x=>!(x.bone===bone&&x.label===label));v.landmarks.push({bone,label,point:p});}
+ render();status('Ponto marcado: '+p.join(', '));
+});
+$('close').onclick=()=>{if(draft.length<3){status('Marque pelo menos três vértices.');return;}if(current().polygons.length>=40){status('Limite de 40 contornos por vista.');return;}remember();current().polygons.push({bone:$('bone').value,points:draft});draft=[];render();status('Contorno salvo na sessão. Baixe o JSON para preservar.');};
+$('cancel').onclick=()=>{draft=[];render();status('Contorno em andamento cancelado.');};
+$('undo').onclick=()=>{if(draft.length)draft.pop();else if(history.length){annotation=JSON.parse(history.pop());dirty=true;}render();};
+for(const id of ['view','bone','mode'])$(id).onchange=()=>{draft=[];render();status('Seleção alterada; contorno não fechado descartado.');};
+$('zoom').onchange=render;
+$('save').onclick=()=>{if(draft.length){status('Feche ou cancele o contorno em andamento antes de baixar.');return;}const blob=new Blob([JSON.stringify(annotation,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='atlas-annotations.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);dirty=false;status('JSON enviado para download. Valide com annotation-export antes de usar.');};
+function validateImport(data){
+ const expected=payload.annotation, names=['AP','LATERAL','OBLIQUE'];
+ if(!data||data.schema_version!==1||data.manifest_sha256!==expected.manifest_sha256||data.coordinate_space!==expected.coordinate_space||!data.views||Object.keys(data.views).sort().join()!==names.slice().sort().join())throw Error();
+ for(const name of names){const v=data.views[name],e=expected.views[name];if(!v||v.source_sha256!==e.source_sha256||v.preview_sha256!==e.preview_sha256||JSON.stringify(v.size)!==JSON.stringify(e.size)||!Array.isArray(v.polygons)||v.polygons.length>40||!Array.isArray(v.landmarks)||v.landmarks.length>100)throw Error();
+ const point=p=>Array.isArray(p)&&p.length===2&&p.every((x,i)=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<v.size[i]);
+ for(const p of v.polygons)if(!p||!Object.hasOwn(colors,p.bone)||!Array.isArray(p.points)||p.points.length<3||p.points.length>200||!p.points.every(point))throw Error();
+ for(const p of v.landmarks)if(!p||!Object.hasOwn(colors,p.bone)||!['P1','P2','P3','P4'].includes(p.label)||!point(p.point))throw Error();
+ }
+}
+$('load').onchange=async event=>{try{const file=event.target.files[0];if(!file)return;if(file.size>262144)throw Error();const data=JSON.parse(await file.text());validateImport(data);remember();annotation=data;draft=[];render();status('Anotações retomadas. A validação geométrica dos contornos ocorre na exportação Python.');}catch{status('JSON inválido, grande demais ou pertencente a outro caso.');}finally{event.target.value='';}};
+window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
+Promise.all(Object.entries(payload.images).map(([name,src])=>new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{pictures[name]=im;resolve();};im.onerror=reject;im.src=src;}))).then(()=>{ready=true;render();}).catch(()=>status('Falha ao carregar imagens. Gere novamente o editor.'));
+</script></body></html>

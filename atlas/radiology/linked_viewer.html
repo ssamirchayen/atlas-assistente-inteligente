@@ -1,0 +1,61 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Atlas Radiologia · Imagens e 3D</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#091421;color:#e4eef8;font:15px system-ui,sans-serif}header{padding:24px 30px;background:#102339;border-bottom:1px solid #304b65}h1{margin:0 0 8px;font-size:25px}.notice{color:#ffd393;line-height:1.5;margin:5px 0}main{max-width:1600px;margin:auto;padding:20px}.toolbar{display:flex;align-items:center;gap:20px;flex-wrap:wrap;background:#152b40;padding:16px;border-radius:9px}label{display:flex;gap:8px;align-items:center}button{padding:10px 15px;border:1px solid #4e6b84;background:#24516a;color:white;border-radius:5px;cursor:pointer}button:focus-visible,input:focus-visible{outline:3px solid #74e6cb}.layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(230px,1fr);gap:18px;margin-top:18px}.panel{background:#102237;border:1px solid #304b65;border-radius:8px;padding:14px}.panel h2{font-size:16px;margin:0 0 12px}.views{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}canvas{display:block;width:100%;background:#030a12;touch-action:none}#scene{aspect-ratio:960/620;cursor:grab}.views canvas{aspect-ratio:1;object-fit:contain;cursor:crosshair}pre{white-space:pre-wrap;line-height:1.6;font:14px ui-monospace,monospace}.help{color:#b1c6d9;line-height:1.6}#status{color:#8fe2cf;min-height:42px}#origin{font-size:13px;letter-spacing:.07em;color:#93bce0}#roi{color:#ffb57c;font-weight:600}@media(max-width:800px){.layout{grid-template-columns:1fr}.views{grid-template-columns:1fr}.views canvas{max-height:420px;width:auto;max-width:100%;margin:auto}header{padding:18px}main{padding:12px}.toolbar{gap:12px}}
+</style></head><body><header><div id="origin"></div><h1>Atlas Radiologia · Imagens ↔ 3D</h1>
+<p class="notice">Modelo geométrico experimental. Não equivale à tomografia; sem validação clínica.</p>
+<p class="notice">O vínculo é calculado pela geometria. Não confirma que um ponto corresponda à mesma estrutura anatômica nas imagens.</p></header>
+<main><div class="toolbar">
+<label>Giro <input id="yaw" type="range" min="-180" max="180" value="35"></label>
+<label>Inclinação <input id="pitch" type="range" min="-85" max="85" value="20"></label>
+<label>Zoom <input id="zoom" type="range" min="50" max="250" value="100"></label>
+<label><input id="wire" type="checkbox"> Arestas</label>
+<button id="reset">Restaurar vista</button><button id="clear">Limpar seleção</button></div>
+<div class="layout"><section class="panel"><h2>Superfície estimada · LPS / mm</h2><canvas id="scene" width="960" height="620" aria-label="Modelo 3D interativo"></canvas></section>
+<aside class="panel"><h2>Ponto selecionado</h2><pre id="coordinates">Nenhum ponto selecionado.</pre><p id="status" role="status">Clique na malha ou em uma das três imagens.</p><p id="roi"></p><p class="help">Arraste para girar. Os controles ajustam giro, inclinação e zoom.</p><p class="help">Ao clicar numa imagem, o sistema escolhe a primeira interseção do raio com a malha. Outras superfícies podem estar no mesmo raio.</p><p class="help">L: esquerda · P: posterior · S: superior. Os eixos pertencem ao referencial informado, não foram inferidos da anatomia.</p><p class="help">Este HTML incorpora imagens e geometria. Mantenha-o no ambiente de pesquisa.</p></aside></div>
+<div class="views"><section class="panel"><h2>AP</h2><canvas id="AP" aria-label="Vista AP"></canvas></section><section class="panel"><h2>Lateral</h2><canvas id="LATERAL" aria-label="Vista lateral"></canvas></section><section class="panel"><h2>Oblíqua</h2><canvas id="OBLIQUE" aria-label="Vista oblíqua"></canvas></section></div></main>
+<script>__LINKED_MATH__</script><script>
+'use strict';
+const data=__LINKED_DATA__, M=AtlasLinkedMath, $=id=>document.getElementById(id);
+const scene=$('scene'), ctx=scene.getContext('2d');
+let selected=null, drawn=[], frame=null, ready=false;
+const pictures={};
+const minimum=[Infinity,Infinity,Infinity],maximum=[-Infinity,-Infinity,-Infinity];
+for(const vertex of data.vertices)for(let i=0;i<3;i++){minimum[i]=Math.min(minimum[i],vertex[i]);maximum[i]=Math.max(maximum[i],vertex[i]);}
+const center=minimum.map((v,i)=>(v+maximum[i])/2),radius=Math.max(...maximum.map((v,i)=>v-minimum[i]),1);
+$('origin').textContent=data.synthetic?'LAB SINTÉTICO · NÃO REPRESENTA OSSO REAL':'CASO DE PESQUISA · IMAGENS NÃO ANONIMIZADAS PELO VISUALIZADOR';
+$('roi').textContent=data.roi_warning?'Atenção: o volume toca o limite da região reconstruída.':'';
+function transform(point){
+ const [x,y,z]=point.map((p,i)=>p-center[i]),yaw=Number($('yaw').value)*Math.PI/180,pitch=Number($('pitch').value)*Math.PI/180;
+ const a=Math.cos(yaw)*x-Math.sin(yaw)*y,b=Math.sin(yaw)*x+Math.cos(yaw)*y;
+ const up=Math.cos(pitch)*z-Math.sin(pitch)*b,depth=Math.sin(pitch)*z+Math.cos(pitch)*b;
+ const scale=430/radius*Number($('zoom').value)/100;
+ return [scene.width/2+a*scale,scene.height/2-up*scale,depth];
+}
+function crossmark(context,x,y,color){context.strokeStyle=color;context.lineWidth=2;context.beginPath();context.moveTo(x-9,y);context.lineTo(x+9,y);context.moveTo(x,y-9);context.lineTo(x,y+9);context.stroke();context.beginPath();context.arc(x,y,5,0,2*Math.PI);context.stroke();}
+function render(){
+ frame=null;if(!ready)return;
+ const projected=data.vertices.map(transform);drawn=data.faces.map(face=>({face,p:face.map(i=>projected[i]),depth:face.reduce((sum,i)=>sum+projected[i][2],0)/3})).sort((a,b)=>a.depth-b.depth);
+ ctx.fillStyle='#030a12';ctx.fillRect(0,0,scene.width,scene.height);
+ for(const item of drawn){const [a,b,c]=item.p;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.lineTo(c[0],c[1]);ctx.closePath();const shade=40+Math.max(0,Math.min(25,(item.depth/radius+.5)*25));ctx.fillStyle=`hsl(174 40% ${shade}%)`;ctx.fill();if($('wire').checked){ctx.strokeStyle='#183e48';ctx.lineWidth=.6;ctx.stroke();}}
+ const o=transform(center);for(const [axis,label,color] of [[0,'L','#ffac78'],[1,'P','#89baff'],[2,'S','#b5ef8c']]){const end=center.slice();end[axis]+=radius*.7;const e=transform(end);ctx.strokeStyle=color;ctx.beginPath();ctx.moveTo(o[0],o[1]);ctx.lineTo(e[0],e[1]);ctx.stroke();ctx.fillStyle=color;ctx.font='16px sans-serif';ctx.fillText(label,e[0]+5,e[1]);}
+ if(selected){const p=transform(selected);crossmark(ctx,p[0],p[1],'#ffdd63');}
+ const lines=selected?['LPS / mm',...selected.map((v,i)=>['L','P','S'][i]+': '+v.toFixed(3))]:['Nenhum ponto selecionado.'];
+ for(const [name,view] of Object.entries(data.views)){const canvas=$(name),context=canvas.getContext('2d');context.drawImage(pictures[name],0,0,canvas.width,canvas.height);if(selected){const p=M.project(selected,view.matrix);if(p&&p[0]>=0&&p[1]>=0&&p[0]<canvas.width&&p[1]<canvas.height){crossmark(context,p[0],p[1],'#ffdd63');lines.push(name+': u='+p[0].toFixed(2)+' v='+p[1].toFixed(2));}else lines.push(name+': fora do campo / atrás da câmera');}}
+ $('coordinates').textContent=lines.join('\n');
+}
+function requestRender(){if(frame===null)frame=requestAnimationFrame(render);}
+function pixel(event,canvas){const rect=canvas.getBoundingClientRect();return [(event.clientX-rect.left)*canvas.width/rect.width,(event.clientY-rect.top)*canvas.height/rect.height];}
+let drag=null;
+scene.addEventListener('pointerdown',event=>{if(!ready)return;drag={x:event.clientX,y:event.clientY,yaw:Number($('yaw').value),pitch:Number($('pitch').value),moved:false};scene.setPointerCapture(event.pointerId);});
+scene.addEventListener('pointermove',event=>{if(!drag)return;const dx=event.clientX-drag.x,dy=event.clientY-drag.y;if(Math.hypot(dx,dy)>3)drag.moved=true;if(drag.moved){$('yaw').value=((drag.yaw+dx*.5+540)%360)-180;$('pitch').value=Math.max(-85,Math.min(85,drag.pitch+dy*.4));requestRender();}});
+scene.addEventListener('pointerup',event=>{if(!drag)return;const moved=drag.moved;drag=null;if(moved)return;const p=pixel(event,scene);let hit=null;for(let i=drawn.length-1;i>=0;i--){const item=drawn[i],b=M.barycentric(p,...item.p);if(b){hit=M.interpolate(item.face.map(j=>data.vertices[j]),b);break;}}if(hit){selected=hit;$('status').textContent='Ponto na superfície selecionado; projeções geométricas indicadas nas três vistas.';}else $('status').textContent='Clique dentro da superfície visível.';requestRender();});
+scene.addEventListener('pointercancel',()=>{drag=null;});
+for(const name of Object.keys(data.views))$(name).addEventListener('click',event=>{if(!ready)return;const hit=M.pickImage(pixel(event,$(name)),data.vertices,data.faces,data.views[name].matrix);if(hit){selected=hit.point;$('status').textContent='Primeira superfície no raio de '+name+'. Isso não resolve a ambiguidade anatômica.';}else{selected=null;$('status').textContent='Este raio não intercepta a malha estimada.';}requestRender();});
+for(const id of ['yaw','pitch','zoom','wire'])$(id).addEventListener('input',requestRender);
+$('reset').onclick=()=>{$('yaw').value=35;$('pitch').value=20;$('zoom').value=100;requestRender();};
+$('clear').onclick=()=>{selected=null;$('status').textContent='Seleção removida.';requestRender();};
+Promise.all(Object.entries(data.views).map(([name,view])=>new Promise((resolve,reject)=>{const canvas=$(name);[canvas.width,canvas.height]=view.size;canvas.style.aspectRatio=view.size[0]+'/'+view.size[1];const image=new Image();image.onload=()=>{pictures[name]=image;resolve();};image.onerror=reject;image.src=view.image;}))).then(()=>{ready=true;requestRender();}).catch(()=>{$('status').textContent='Falha ao carregar imagens; gere novamente o visualizador.';});
+</script></body></html>

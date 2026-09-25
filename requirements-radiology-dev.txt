@@ -1,0 +1,9 @@
+# Optional isolated environment for this module's tests (Python 3.13).
+-r requirements-radiology.txt
+pytest==9.1.1
+ruff==0.16.8
+iniconfig==2.3.0
+packaging==26.3
+pluggy==1.6.0
+pygments==2.21.0
+colorama==0.4.6 ; sys_platform == 'win32'
