@@ -1,0 +1,1 @@
+{"dependencies": [{"name": "numpy", "version": "2.5.3", "vulns": []}, {"name": "pillow", "version": "12.3.0", "vulns": []}, {"name": "pydicom", "version": "3.0.2", "vulns": []}], "fixes": []}
