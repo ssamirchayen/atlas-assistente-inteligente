@@ -17,6 +17,14 @@ com foco em privacidade, confiabilidade e evolução para cenários empresariais
 > Projeto em desenvolvimento ativo. A versão atual é voltada para Windows e
 > execução local, não para uso em ambientes críticos de produção.
 
+## Demonstração
+
+![Atlas em funcionamento](docs/media/atlas-demo.gif)
+
+**Atlas em execução real:** comandos por voz, automação local e interação com o workspace.
+
+[▶ Ver demonstração completa em vídeo](docs/media/atlas-demo.mp4)
+
 ## Destaques técnicos
 
 - arquitetura modular com Kernel, Controller, Planner, Workflow e Executor;
