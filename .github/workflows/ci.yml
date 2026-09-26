@@ -27,16 +27,18 @@ jobs:
         with:
           python-version: "3.13"
           cache: "pip"
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: |
+            requirements.txt
+            requirements-radiology.txt
+            requirements-radiology-dev.txt
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
       - name: Install project dependencies
-        run: python -m pip install -r requirements.txt
-
-      - name: Install quality tools
-        run: python -m pip install pytest ruff
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-radiology-dev.txt
 
       - name: Show environment
         run: |
@@ -44,6 +46,9 @@ jobs:
           python -m pip --version
           ruff --version
           python -m pytest --version
+          python -c "import numpy; print('NumPy', numpy.__version__)"
+          python -c "import PIL; print('Pillow', PIL.__version__)"
+          python -c "import pydicom; print('pydicom', pydicom.__version__)"
 
       - name: Run Ruff
         run: ruff check .
