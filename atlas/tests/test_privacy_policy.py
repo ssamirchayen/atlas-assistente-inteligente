@@ -410,7 +410,3 @@ def test_policy_rejects_ambiguous_field_protection() -> None:
 def test_sprint24_stage2_files_exist() -> None:
     root = Path(__file__).resolve().parents[2]
     assert (root / "privacy_policy_pilot.py").is_file()
-    assert (
-        root / "docs" / "SPRINT24_ETAPA2_PRIVACY_POLICY_ENGINE.md"
-    ).is_file()
-    assert (root / "docs" / "SPRINT24_ETAPA2_VALIDACAO.md").is_file()

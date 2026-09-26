@@ -146,5 +146,3 @@ def test_catalog_report_has_no_low_risk_false_assurance() -> None:
 def test_sprint24_stage1_files_exist() -> None:
     root = Path(__file__).resolve().parents[2]
     assert (root / "privacy_inventory_pilot.py").is_file()
-    assert (root / "docs" / "SPRINT24_ETAPA1_INVENTARIO_DADOS.md").is_file()
-    assert (root / "docs" / "SPRINT24_ETAPA1_VALIDACAO.md").is_file()

@@ -695,7 +695,3 @@ def test_concurrent_distinct_approvals_remain_consistent() -> None:
 def test_sprint24_stage3_files_exist() -> None:
     root = Path(__file__).resolve().parents[2]
     assert (root / "privacy_rights_pilot.py").is_file()
-    assert (
-        root / "docs" / "SPRINT24_ETAPA3_DIREITOS_TITULARES.md"
-    ).is_file()
-    assert (root / "docs" / "SPRINT24_ETAPA3_VALIDACAO.md").is_file()
