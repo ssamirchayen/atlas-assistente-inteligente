@@ -152,7 +152,9 @@ class AtlasWindow(QMainWindow):
         self.setWindowTitle(f"{ATLAS_NAME} — Intelligence Workspace")
         self.resize(1500, 920)
         self.setMinimumSize(1180, 760)
-        self.setStyleSheet(application_stylesheet())
+        self.setStyleSheet(
+            application_stylesheet() + "\n" + self._authorial_stylesheet()
+        )
 
     def _build_interface(self) -> None:
         root = QWidget()
@@ -167,18 +169,18 @@ class AtlasWindow(QMainWindow):
         workspace = QWidget()
         workspace.setObjectName("workspace")
         page = QVBoxLayout(workspace)
-        page.setContentsMargins(28, 24, 28, 24)
-        page.setSpacing(18)
+        page.setContentsMargins(31, 22, 27, 29)
+        page.setSpacing(13)
         page.addWidget(self._build_header())
 
         body = QHBoxLayout()
-        body.setSpacing(16)
+        body.setSpacing(21)
 
         conversation_column = QWidget()
         conversation_column.setObjectName("conversationColumn")
         conversation_layout = QVBoxLayout(conversation_column)
         conversation_layout.setContentsMargins(0, 0, 0, 0)
-        conversation_layout.setSpacing(12)
+        conversation_layout.setSpacing(7)
         conversation_layout.addWidget(
             self._build_conversation_card(),
             stretch=1,
@@ -194,53 +196,45 @@ class AtlasWindow(QMainWindow):
     def _build_sidebar(self) -> QFrame:
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(246)
+        sidebar.setFixedWidth(238)
         layout = QVBoxLayout(sidebar)
-        layout.setContentsMargins(20, 22, 20, 20)
-        layout.setSpacing(10)
+        layout.setContentsMargins(19, 25, 17, 16)
+        layout.setSpacing(11)
 
-        brand = QHBoxLayout()
-        brand.setSpacing(12)
-        logo = QLabel("A")
-        logo.setObjectName("logoBadge")
-        logo.setFixedSize(46, 46)
-        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        brand = QFrame()
+        brand.setObjectName("brandBlock")
+        brand_layout = QVBoxLayout(brand)
+        brand_layout.setContentsMargins(0, 0, 0, 12)
+        brand_layout.setSpacing(2)
 
-        identity = QVBoxLayout()
-        identity.setSpacing(0)
+        brand_index = QLabel("A / 01")
+        brand_index.setObjectName("brandIndex")
         brand_name = QLabel(ATLAS_NAME.upper())
         brand_name.setObjectName("sidebarBrand")
-        brand_caption = QLabel("by NEXYRA")
+        brand_caption = QLabel("LOCAL INTELLIGENCE  ·  NEXYRA")
         brand_caption.setObjectName("sidebarCaption")
-        identity.addWidget(brand_name)
-        identity.addWidget(brand_caption)
-
-        brand.addWidget(logo)
-        brand.addLayout(identity)
-        brand.addStretch()
-        layout.addLayout(brand)
-
-        product_caption = QLabel("LOCAL INTELLIGENCE SYSTEM")
-        product_caption.setObjectName("productCaption")
-        layout.addWidget(product_caption)
+        brand_layout.addWidget(brand_index)
+        brand_layout.addWidget(brand_name)
+        brand_layout.addWidget(brand_caption)
+        layout.addWidget(brand)
 
         divider = QFrame()
         divider.setObjectName("sidebarDivider")
         divider.setFrameShape(QFrame.Shape.HLine)
         layout.addWidget(divider)
 
-        section = QLabel("WORKSPACE")
+        section = QLabel("WORKSPACE / CONTROL")
         section.setObjectName("sidebarSection")
         layout.addWidget(section)
 
         active_area = QFrame()
         active_area.setObjectName("activeArea")
         active_layout = QHBoxLayout(active_area)
-        active_layout.setContentsMargins(12, 10, 12, 10)
-        active_layout.setSpacing(10)
-        area_mark = QLabel("●")
+        active_layout.setContentsMargins(10, 9, 10, 9)
+        active_layout.setSpacing(8)
+        area_mark = QLabel("▍")
         area_mark.setObjectName("activeAreaMark")
-        area_label = QLabel("Conversa")
+        area_label = QLabel("conversa")
         area_label.setObjectName("activeAreaText")
         active_layout.addWidget(area_mark)
         active_layout.addWidget(area_label)
@@ -268,13 +262,12 @@ class AtlasWindow(QMainWindow):
         privacy = QFrame()
         privacy.setObjectName("privacyCard")
         privacy_layout = QVBoxLayout(privacy)
-        privacy_layout.setContentsMargins(13, 12, 13, 12)
-        privacy_layout.setSpacing(4)
-        privacy_title = QLabel("PRIVACY FIRST")
+        privacy_layout.setContentsMargins(11, 10, 11, 10)
+        privacy_layout.setSpacing(3)
+        privacy_title = QLabel("LOCAL / PRIVATE")
         privacy_title.setObjectName("privacyTitle")
         privacy_text = QLabel(
-            "Processamento local por padrão. Integrações externas "
-            "somente quando habilitadas."
+            "Dados e contexto permanecem locais por padrão."
         )
         privacy_text.setWordWrap(True)
         privacy_text.setObjectName("privacyText")
@@ -292,16 +285,16 @@ class AtlasWindow(QMainWindow):
         frame.setObjectName("topHeader")
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setSpacing(14)
 
         heading = QVBoxLayout()
-        heading.setSpacing(3)
+        heading.setSpacing(1)
         eyebrow = QLabel("NEXYRA  /  ATLAS INTELLIGENCE")
         eyebrow.setObjectName("pageEyebrow")
-        title = QLabel("Workspace")
+        title = QLabel("Command workspace")
         title.setObjectName("pageTitle")
         subtitle = QLabel(
-            "Comando, contexto e automação em uma única interface operacional."
+            "memória  ·  raciocínio  ·  automação  ·  visão"
         )
         subtitle.setObjectName("pageSubtitle")
         heading.addWidget(eyebrow)
@@ -310,59 +303,36 @@ class AtlasWindow(QMainWindow):
         layout.addLayout(heading)
         layout.addStretch()
 
-        for caption_text, value_text in (
-            ("ENGINE", "Atlas Core"),
-            ("RUNTIME", "Local"),
-        ):
-            signal = QFrame()
-            signal.setObjectName("headerSignal")
-            signal_layout = QVBoxLayout(signal)
-            signal_layout.setContentsMargins(12, 8, 12, 8)
-            signal_layout.setSpacing(1)
-            caption = QLabel(caption_text)
-            caption.setObjectName("headerSignalCaption")
-            value = QLabel(value_text)
-            value.setObjectName("headerSignalValue")
-            signal_layout.addWidget(caption)
-            signal_layout.addWidget(value)
-            layout.addWidget(signal)
+        telemetry = QFrame()
+        telemetry.setObjectName("headerTelemetry")
+        telemetry_layout = QHBoxLayout(telemetry)
+        telemetry_layout.setContentsMargins(4, 6, 2, 4)
+        telemetry_layout.setSpacing(8)
 
-        clock_signal = QFrame()
-        clock_signal.setObjectName("headerSignal")
-        clock_layout = QVBoxLayout(clock_signal)
-        clock_layout.setContentsMargins(12, 8, 12, 8)
-        clock_layout.setSpacing(1)
-        clock_caption = QLabel("LOCAL TIME")
-        clock_caption.setObjectName("headerSignalCaption")
+        runtime = QLabel("core/local")
+        runtime.setObjectName("headerTechValue")
+        telemetry_layout.addWidget(runtime)
+
+        separator = QLabel("/")
+        separator.setObjectName("headerTechSeparator")
+        telemetry_layout.addWidget(separator)
+
         self.clock_label = QLabel(datetime.now().strftime("%H:%M"))
-        self.clock_label.setObjectName("headerSignalValue")
-        clock_layout.addWidget(clock_caption)
-        clock_layout.addWidget(self.clock_label)
-        layout.addWidget(clock_signal)
+        self.clock_label.setObjectName("headerTechValue")
+        telemetry_layout.addWidget(self.clock_label)
+        layout.addWidget(telemetry)
 
         user_card = QFrame()
         user_card.setObjectName("userCard")
-        user_layout = QHBoxLayout(user_card)
-        user_layout.setContentsMargins(10, 7, 11, 7)
-        user_layout.setSpacing(9)
-
-        avatar = QLabel(USER_NAME[:1].upper() if USER_NAME else "U")
-        avatar.setObjectName("userAvatar")
-        avatar.setFixedSize(36, 36)
-        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        user_block = QVBoxLayout()
-        user_block.setSpacing(2)
+        user_layout = QVBoxLayout(user_card)
+        user_layout.setContentsMargins(10, 6, 10, 6)
+        user_layout.setSpacing(0)
         user_name = QLabel(USER_NAME)
         user_name.setObjectName("userName")
-        self.status_label = QLabel("●  ONLINE")
+        self.status_label = QLabel("↳ online")
         self.status_label.setObjectName("status")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        user_block.addWidget(user_name)
-        user_block.addWidget(self.status_label)
-
-        user_layout.addWidget(avatar)
-        user_layout.addLayout(user_block)
+        user_layout.addWidget(user_name)
+        user_layout.addWidget(self.status_label)
         layout.addWidget(user_card)
         return frame
 
@@ -376,27 +346,25 @@ class AtlasWindow(QMainWindow):
         conversation_header = QFrame()
         conversation_header.setObjectName("conversationHeader")
         header_layout = QHBoxLayout(conversation_header)
-        header_layout.setContentsMargins(18, 13, 18, 13)
+        header_layout.setContentsMargins(16, 11, 16, 10)
         header_layout.setSpacing(10)
 
-        assistant_avatar = QLabel("A")
-        assistant_avatar.setObjectName("assistantAvatar")
-        assistant_avatar.setFixedSize(34, 34)
-        assistant_avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header_layout.addWidget(assistant_avatar)
+        signature = QLabel("A/")
+        signature.setObjectName("assistantSignature")
+        header_layout.addWidget(signature)
 
         title_block = QVBoxLayout()
-        title_block.setSpacing(1)
-        title = QLabel("Atlas")
+        title_block.setSpacing(0)
+        title = QLabel("Atlas / dialogue stream")
         title.setObjectName("conversationTitle")
-        caption = QLabel("Canal principal  •  Atlas Core")
+        caption = QLabel("contexto persistente · execução supervisionada")
         caption.setObjectName("conversationCaption")
         title_block.addWidget(title)
         title_block.addWidget(caption)
         header_layout.addLayout(title_block)
         header_layout.addStretch()
 
-        self.session_label = QLabel("●  Sessão local ativa")
+        self.session_label = QLabel("● sessão local ativa")
         self.session_label.setObjectName("sessionLabel")
         header_layout.addWidget(self.session_label)
         layout.addWidget(conversation_header)
@@ -407,7 +375,7 @@ class AtlasWindow(QMainWindow):
         self.chat.setPlaceholderText(
             "Converse com o Atlas ou execute uma tarefa."
         )
-        self.chat.document().setDocumentMargin(20)
+        self.chat.document().setDocumentMargin(18)
         layout.addWidget(self.chat, stretch=1)
         return frame
 
@@ -415,14 +383,14 @@ class AtlasWindow(QMainWindow):
         frame = QFrame()
         frame.setObjectName("commandPanel")
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(14, 11, 14, 12)
-        layout.setSpacing(9)
+        layout.setContentsMargins(12, 10, 12, 11)
+        layout.setSpacing(8)
 
         activity = QHBoxLayout()
-        activity.setSpacing(8)
-        activity_mark = QLabel("●")
+        activity.setSpacing(7)
+        activity_mark = QLabel("↳")
         activity_mark.setObjectName("activityMark")
-        self.activity_label = QLabel("Pronto para receber comandos")
+        self.activity_label = QLabel("pronto para receber comandos")
         self.activity_label.setObjectName("activityText")
         activity.addWidget(activity_mark)
         activity.addWidget(self.activity_label)
@@ -436,13 +404,11 @@ class AtlasWindow(QMainWindow):
         layout.addLayout(activity)
 
         command_bar = QHBoxLayout()
-        command_bar.setSpacing(8)
+        command_bar.setSpacing(7)
 
         self.input = QLineEdit()
         self.input.setObjectName("commandInput")
-        self.input.setPlaceholderText(
-            "Mensagem, pergunta ou comando para o Atlas..."
-        )
+        self.input.setPlaceholderText("mensagem, pergunta ou comando…")
         self.input.returnPressed.connect(self.send_command)
 
         self.mic_button = QPushButton("Microfone")
@@ -473,8 +439,7 @@ class AtlasWindow(QMainWindow):
         layout.addWidget(self.processing_bar)
 
         hint = QLabel(
-            "Enter para enviar  •  processamento local  •  "
-            "diga 'Atlas, pare' para interromper"
+            "ENTER envia  /  ATLAS, PARE interrompe  /  execução local"
         )
         hint.setObjectName("commandHint")
         layout.addWidget(hint)
@@ -483,141 +448,260 @@ class AtlasWindow(QMainWindow):
     def _build_insights_rail(self) -> QFrame:
         rail = QFrame()
         rail.setObjectName("insightsRail")
-        rail.setFixedWidth(300)
+        rail.setFixedWidth(304)
         layout = QVBoxLayout(rail)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setContentsMargins(7, 3, 0, 5)
+        layout.setSpacing(17)
 
+        rail_index = QLabel("A/OS   LIVE SIGNAL")
+        rail_index.setObjectName("railIndex")
+        layout.addWidget(rail_index)
+
+        # Atlas Pulse deixa de ser um card de dashboard. Ele funciona como
+        # um instrumento visual aberto, conectado diretamente ao rail.
         pulse = QFrame()
-        pulse.setObjectName("heroMetricCard")
+        pulse.setObjectName("atlasPulseDeck")
         pulse_layout = QVBoxLayout(pulse)
-        pulse_layout.setContentsMargins(16, 15, 16, 15)
-        pulse_layout.setSpacing(10)
+        pulse_layout.setContentsMargins(3, 0, 5, 15)
+        pulse_layout.setSpacing(8)
+
+        pulse_axis = QLabel("PULSE ───────── cognitive / operational")
+        pulse_axis.setObjectName("pulseAxis")
+        pulse_layout.addWidget(pulse_axis)
 
         orb_row = QHBoxLayout()
-        orb_row.setSpacing(12)
+        orb_row.setContentsMargins(8, 1, 0, 2)
+        orb_row.setSpacing(15)
         self.atlas_orb = AtlasOrb()
-        orb_copy = QVBoxLayout()
-        orb_copy.setSpacing(3)
-        pulse_title = QLabel("Atlas Pulse")
-        pulse_title.setObjectName("pulseTitle")
-        pulse_text = QLabel("Estado cognitivo e operacional")
-        pulse_text.setObjectName("pulseText")
-        self.orb_state_label = QLabel("ONLINE")
+        orb_row.addWidget(
+            self.atlas_orb,
+            alignment=Qt.AlignmentFlag.AlignLeft
+            | Qt.AlignmentFlag.AlignVCenter,
+        )
+
+        pulse_copy = QVBoxLayout()
+        pulse_copy.setSpacing(0)
+        self.orb_state_label = QLabel("online")
         self.orb_state_label.setObjectName("orbState")
-        orb_copy.addWidget(pulse_title)
-        orb_copy.addWidget(pulse_text)
-        orb_copy.addSpacing(4)
-        orb_copy.addWidget(self.orb_state_label)
-        orb_copy.addStretch()
-        orb_row.addWidget(self.atlas_orb)
-        orb_row.addLayout(orb_copy, stretch=1)
+        pulse_text = QLabel("reasoning stream / local")
+        pulse_text.setObjectName("pulseText")
+        pulse_copy.addWidget(self.orb_state_label)
+        pulse_copy.addWidget(pulse_text)
+        pulse_copy.addStretch()
+        orb_row.addLayout(pulse_copy, stretch=1)
         pulse_layout.addLayout(orb_row)
 
-        pulse_divider = QFrame()
-        pulse_divider.setObjectName("softDivider")
-        pulse_divider.setFrameShape(QFrame.Shape.HLine)
-        pulse_layout.addWidget(pulse_divider)
-
-        workflow_caption = QLabel("WORKFLOW")
-        workflow_caption.setObjectName("metricCaption")
-        self.workflow_label = QLabel("Pronto")
-        self.workflow_label.setObjectName("metricValue")
-        mode_caption = QLabel("INTERAÇÃO")
-        mode_caption.setObjectName("metricCaption")
-        self.mode_label = QLabel("Texto + voz")
-        self.mode_label.setObjectName("metricValue")
-        pulse_layout.addWidget(workflow_caption)
-        pulse_layout.addWidget(self.workflow_label)
-        pulse_layout.addWidget(mode_caption)
-        pulse_layout.addWidget(self.mode_label)
-
-        capability_row = QHBoxLayout()
-        capability_row.setSpacing(6)
-        for label_text in ("VOICE", "VISION", "MEMORY"):
-            chip = QLabel(label_text)
-            chip.setObjectName("capabilityChip")
-            chip.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            capability_row.addWidget(chip)
-        pulse_layout.addLayout(capability_row)
+        state_row = QHBoxLayout()
+        state_row.setContentsMargins(8, 1, 0, 0)
+        state_row.setSpacing(14)
+        self.workflow_label = QLabel("workflow: pronto")
+        self.workflow_label.setObjectName("workflowState")
+        self.mode_label = QLabel("io: texto + voz")
+        self.mode_label.setObjectName("workflowStateMuted")
+        state_row.addWidget(self.workflow_label)
+        state_row.addWidget(self.mode_label)
+        state_row.addStretch()
+        pulse_layout.addLayout(state_row)
         layout.addWidget(pulse)
 
-        resources = QFrame()
-        resources.setObjectName("infoCard")
-        resources_layout = QVBoxLayout(resources)
-        resources_layout.setContentsMargins(16, 14, 16, 15)
-        resources_layout.setSpacing(8)
-        resources_title = QLabel("Recursos")
-        resources_title.setObjectName("cardTitle")
-        resources_caption = QLabel("Telemetria local")
-        resources_caption.setObjectName("cardCaption")
-        resources_layout.addWidget(resources_title)
-        resources_layout.addWidget(resources_caption)
+        # O Trace é o elemento proprietário da interface: mais parecido com
+        # um instrumento de execução do que com um conjunto de métricas SaaS.
+        trace = QFrame()
+        trace.setObjectName("traceCard")
+        trace_layout = QVBoxLayout(trace)
+        trace_layout.setContentsMargins(13, 9, 6, 11)
+        trace_layout.setSpacing(5)
+        trace_title = QLabel("ATLAS TRACE / 04")
+        trace_title.setObjectName("traceTitle")
+        trace_caption = QLabel("capture → route → reason → act")
+        trace_caption.setObjectName("traceCaption")
+        trace_layout.addWidget(trace_title)
+        trace_layout.addWidget(trace_caption)
 
-        self.cpu_label = QLabel("CPU   0%")
-        self.cpu_label.setObjectName("resourceLabel")
+        self.trace_labels: dict[str, QLabel] = {}
+        for key, label_text in (
+            ("capture", "01  capture"),
+            ("route", "02  route"),
+            ("reason", "03  reason"),
+            ("act", "04  act"),
+        ):
+            node = QLabel(label_text)
+            node.setObjectName("traceNode")
+            self.trace_labels[key] = node
+            trace_layout.addWidget(node)
+        layout.addWidget(trace)
+
+        # Telemetria vira rodapé técnico em linha — sem card, sem título +
+        # número empilhado e sem barras visuais de dashboard.
+        telemetry = QFrame()
+        telemetry.setObjectName("telemetryStrip")
+        telemetry_layout = QVBoxLayout(telemetry)
+        telemetry_layout.setContentsMargins(2, 3, 3, 0)
+        telemetry_layout.setSpacing(4)
+
+        telemetry_axis = QLabel("LOCAL TELEMETRY / 1500ms")
+        telemetry_axis.setObjectName("telemetryAxis")
+        telemetry_layout.addWidget(telemetry_axis)
+
+        telemetry_values = QHBoxLayout()
+        telemetry_values.setContentsMargins(7, 0, 0, 0)
+        telemetry_values.setSpacing(10)
+        self.cpu_label = QLabel("cpu: 000%")
+        self.cpu_label.setObjectName("telemetryValue")
+        separator = QLabel("/")
+        separator.setObjectName("telemetrySeparator")
+        self.ram_label = QLabel("mem: 000%")
+        self.ram_label.setObjectName("telemetryValue")
+        local = QLabel("local")
+        local.setObjectName("localState")
+        telemetry_values.addWidget(self.cpu_label)
+        telemetry_values.addWidget(separator)
+        telemetry_values.addWidget(self.ram_label)
+        telemetry_values.addStretch()
+        telemetry_values.addWidget(local)
+        telemetry_layout.addLayout(telemetry_values)
+
+        # Mantidos invisíveis para preservar o contrato/telemetria existente.
         self.cpu_bar = QProgressBar()
         self.cpu_bar.setObjectName("resourceBar")
         self.cpu_bar.setRange(0, 100)
         self.cpu_bar.setValue(0)
         self.cpu_bar.setTextVisible(False)
-
-        self.ram_label = QLabel("MEMÓRIA   0%")
-        self.ram_label.setObjectName("resourceLabel")
+        self.cpu_bar.setVisible(False)
         self.ram_bar = QProgressBar()
         self.ram_bar.setObjectName("resourceBar")
         self.ram_bar.setRange(0, 100)
         self.ram_bar.setValue(0)
         self.ram_bar.setTextVisible(False)
-
-        resources_layout.addWidget(self.cpu_label)
-        resources_layout.addWidget(self.cpu_bar)
-        resources_layout.addWidget(self.ram_label)
-        resources_layout.addWidget(self.ram_bar)
-        layout.addWidget(resources)
-
-        quick = QFrame()
-        quick.setObjectName("infoCard")
-        quick_layout = QVBoxLayout(quick)
-        quick_layout.setContentsMargins(16, 14, 16, 15)
-        quick_layout.setSpacing(7)
-        quick_title = QLabel("Ações rápidas")
-        quick_title.setObjectName("cardTitle")
-        quick_caption = QLabel("Acesso às ferramentas do workspace")
-        quick_caption.setObjectName("cardCaption")
-        quick_layout.addWidget(quick_title)
-        quick_layout.addWidget(quick_caption)
-
-        history_quick = QPushButton("Histórico operacional")
-        history_quick.setObjectName("quickButton")
-        history_quick.clicked.connect(self.show_session_history)
-        admin_quick = QPushButton("Abrir Admin Console")
-        admin_quick.setObjectName("quickButton")
-        admin_quick.clicked.connect(self.show_admin_console)
-        quick_layout.addWidget(history_quick)
-        quick_layout.addWidget(admin_quick)
-        layout.addWidget(quick)
-
-        trust = QFrame()
-        trust.setObjectName("infoCard")
-        trust_layout = QVBoxLayout(trust)
-        trust_layout.setContentsMargins(16, 14, 16, 15)
-        trust_layout.setSpacing(7)
-        trust_title = QLabel("Ambiente")
-        trust_title.setObjectName("cardTitle")
-        trust_caption = QLabel(
-            "Execução local e controle do usuário como padrão."
-        )
-        trust_caption.setObjectName("cardBody")
-        trust_caption.setWordWrap(True)
-        local = QLabel("●  Núcleo local ativo")
-        local.setObjectName("localState")
-        trust_layout.addWidget(trust_title)
-        trust_layout.addWidget(trust_caption)
-        trust_layout.addWidget(local)
-        layout.addWidget(trust)
+        self.ram_bar.setVisible(False)
+        telemetry_layout.addWidget(self.cpu_bar)
+        telemetry_layout.addWidget(self.ram_bar)
         layout.addStretch()
+        layout.addWidget(telemetry)
+
+        self._update_trace_state("ONLINE")
         return rail
+
+    def _update_trace_state(self, status: str) -> None:
+        if not hasattr(self, "trace_labels"):
+            return
+
+        normalized = status.upper()
+        if normalized in {"OUVINDO", "ESCUTA ATIVA"}:
+            active = "capture"
+        elif normalized in {"PROCESSANDO", "PENSANDO"}:
+            active = "reason"
+        elif normalized in {"EXECUTANDO", "CANCELANDO"}:
+            active = "act"
+        elif normalized in {"FALANDO", "CONCLUÍDO"}:
+            active = "act"
+        else:
+            active = "route"
+
+        order = ("capture", "route", "reason", "act")
+        active_index = order.index(active)
+        for index, key in enumerate(order):
+            label = self.trace_labels[key]
+            if index == active_index:
+                label.setStyleSheet(
+                    "QLabel#traceNode {"
+                    "color:#e8f2ed; background:#12211e;"
+                    "border-left:2px solid #56e0c1;"
+                    "padding:6px 8px;"
+                    "font-family:'Cascadia Mono', Consolas;"
+                    "font-size:10px; font-weight:600;}"
+                )
+            elif index < active_index:
+                label.setStyleSheet(
+                    "QLabel#traceNode {"
+                    "color:#789a90; background:transparent;"
+                    "border-left:2px solid #28564f;"
+                    "padding:6px 8px;"
+                    "font-family:'Cascadia Mono', Consolas;"
+                    "font-size:10px;}"
+                )
+            else:
+                label.setStyleSheet(
+                    "QLabel#traceNode {"
+                    "color:#4d5b56; background:transparent;"
+                    "border-left:2px solid #1c2a26;"
+                    "padding:6px 8px;"
+                    "font-family:'Cascadia Mono', Consolas;"
+                    "font-size:10px;}"
+                )
+
+    @staticmethod
+    def _authorial_stylesheet() -> str:
+        return r"""
+        QMainWindow, QWidget#root, QWidget#workspace { background:#090d0c; color:#dfe8e3; }
+        QWidget { font-family:Bahnschrift, "Segoe UI"; font-size:12px; }
+
+        QFrame#sidebar { background:#0b100f; border:none; border-right:1px solid #1c2a26; }
+        QFrame#brandBlock { background:transparent; border:none; }
+        QLabel#brandIndex { color:#d7a94b; font-family:"Cascadia Mono", Consolas; font-size:10px; font-weight:600; }
+        QLabel#sidebarBrand { color:#eff5f1; font-family:Bahnschrift, "Segoe UI Semibold"; font-size:26px; font-weight:600; letter-spacing:2px; }
+        QLabel#sidebarCaption, QLabel#pageEyebrow, QLabel#sidebarSection, QLabel#privacyTitle, QLabel#commandHint, QLabel#railIndex, QLabel#pulseAxis, QLabel#traceTitle, QLabel#telemetryAxis { color:#64736d; font-family:"Cascadia Mono", Consolas; font-size:9px; font-weight:600; letter-spacing:1px; }
+        QFrame#sidebarDivider { background:#1c2a26; border:none; max-height:1px; }
+        QFrame#activeArea { background:#101816; border:none; border-left:2px solid #56e0c1; border-radius:0; }
+        QLabel#activeAreaMark { color:#56e0c1; font-size:13px; }
+        QLabel#activeAreaText { color:#dce9e3; font-family:Bahnschrift; font-size:12px; }
+        QPushButton#sidebarButton { background:transparent; color:#84928c; border:none; border-left:1px solid #24332f; border-radius:0; padding:8px 10px; text-align:left; }
+        QPushButton#sidebarButton:hover { color:#e6efea; border-left:2px solid #d7a94b; }
+        QPushButton#sidebarAccentButton { background:transparent; color:#56e0c1; border:none; border-left:2px solid #28564f; border-radius:0; padding:8px 10px; text-align:left; }
+        QFrame#privacyCard { background:transparent; border:none; border-left:1px solid #293a35; border-radius:0; }
+        QLabel#privacyText, QLabel#versionLabel { color:#65736d; font-size:10px; }
+
+        QFrame#topHeader { background:transparent; border:none; }
+        QLabel#pageTitle { color:#f0f5f2; font-family:Bahnschrift, "Segoe UI Semibold"; font-size:30px; font-weight:600; }
+        QLabel#pageSubtitle { color:#75837d; font-family:"Cascadia Mono", Consolas; font-size:10px; }
+        QFrame#headerTelemetry { background:transparent; border:none; border-bottom:1px solid #26332f; border-radius:0; }
+        QLabel#headerTechValue { color:#9db0a8; font-family:"Cascadia Mono", Consolas; font-size:10px; }
+        QLabel#headerTechSeparator { color:#d7a94b; }
+        QFrame#userCard { background:transparent; border:none; }
+        QLabel#userName { color:#aebbb5; font-family:Bahnschrift; font-size:11px; }
+
+        QFrame#conversationCard { background:#0b1110; border:1px solid #1b2925; border-left:2px solid #223d37; border-radius:0; }
+        QFrame#conversationHeader { background:#0d1412; border:none; border-bottom:1px solid #1b2925; }
+        QLabel#assistantSignature { color:#56e0c1; font-family:Bahnschrift; font-size:22px; font-weight:600; }
+        QLabel#conversationTitle { color:#dfe9e4; font-family:Bahnschrift; font-size:13px; }
+        QLabel#conversationCaption, QLabel#sessionLabel { color:#61706a; font-family:"Cascadia Mono", Consolas; font-size:9px; }
+        QTextEdit#chat { background:#090e0d; color:#dfe8e3; border:none; border-radius:0; padding:4px; selection-background-color:#1c6b63; }
+
+        QFrame#commandPanel { background:#0d1412; border:none; border-left:2px solid #6f5930; border-bottom:1px solid #22312d; border-radius:0; }
+        QLabel#activityMark { color:#d7a94b; font-family:Consolas; }
+        QLabel#activityText { color:#72817a; font-family:"Cascadia Mono", Consolas; font-size:9px; }
+        QLineEdit#commandInput { background:#090e0d; color:#e6efea; border:none; border-bottom:1px solid #344740; border-radius:0; padding:10px 7px; selection-background-color:#1c6b63; }
+        QLineEdit#commandInput:focus { border-bottom:2px solid #3b8277; }
+        QPushButton#primaryButton { background:#1c6b63; color:#eef7f3; border:none; border-radius:0; padding:9px 16px; font-family:Bahnschrift; font-weight:600; }
+        QPushButton#primaryButton:hover { background:#237a71; }
+        QPushButton#secondaryButton, QPushButton#cancelButton { background:transparent; color:#899991; border:none; border-bottom:1px solid #293a35; border-radius:0; padding:9px 10px; }
+        QPushButton#secondaryButton:hover { color:#e5eee9; border-bottom-color:#4b665f; }
+        QProgressBar#processingBar { min-height:2px; max-height:2px; background:#16211e; border:none; border-radius:0; }
+        QProgressBar#processingBar::chunk { background:#56e0c1; }
+
+        QFrame#insightsRail { background:transparent; border:none; }
+        QLabel#railIndex { color:#d7a94b; padding-left:3px; }
+        QFrame#atlasPulseDeck { background:transparent; border:none; border-left:1px solid #29433c; border-radius:0; }
+        QLabel#pulseAxis { color:#60716a; padding-left:8px; }
+        QLabel#orbState { color:#56e0c1; font-family:Bahnschrift; font-size:24px; font-weight:600; }
+        QLabel#pulseText { color:#64736d; font-family:"Cascadia Mono", Consolas; font-size:9px; }
+        QLabel#workflowState { color:#d7a94b; font-family:"Cascadia Mono", Consolas; font-size:9px; border:none; padding:0; }
+        QLabel#workflowStateMuted { color:#708078; font-family:"Cascadia Mono", Consolas; font-size:9px; }
+
+        QFrame#traceCard { background:#0a100e; border:none; border-left:1px solid #6f5930; border-radius:0; }
+        QLabel#traceCaption { color:#5f6d67; font-family:"Cascadia Mono", Consolas; font-size:9px; margin-bottom:4px; }
+        QLabel#traceNode { color:#4d5b56; border-left:2px solid #1c2a26; padding:6px 8px; font-family:"Cascadia Mono", Consolas; font-size:10px; }
+
+        QFrame#telemetryStrip { background:transparent; border:none; border-top:1px solid #1c2a26; border-radius:0; }
+        QLabel#telemetryAxis { color:#4f5e58; padding-top:5px; }
+        QLabel#telemetryValue { color:#8fa099; font-family:"Cascadia Mono", Consolas; font-size:10px; }
+        QLabel#telemetrySeparator { color:#4c5c56; font-family:"Cascadia Mono", Consolas; font-size:10px; }
+        QLabel#localState { color:#4f897e; font-family:"Cascadia Mono", Consolas; font-size:9px; }
+
+        QScrollBar:vertical { background:#090d0c; width:7px; margin:0; }
+        QScrollBar::handle:vertical { background:#263631; min-height:28px; border-radius:0; }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }
+        """
 
     def _start_system_monitor(self) -> None:
         self.timer = QTimer(self)
@@ -627,8 +711,8 @@ class AtlasWindow(QMainWindow):
     def update_stats(self) -> None:
         cpu = round(psutil.cpu_percent())
         ram = round(psutil.virtual_memory().percent)
-        self.cpu_label.setText(f"CPU   {cpu}%")
-        self.ram_label.setText(f"MEMÓRIA   {ram}%")
+        self.cpu_label.setText(f"cpu: {cpu:03d}%")
+        self.ram_label.setText(f"mem: {ram:03d}%")
         self.cpu_bar.setValue(cpu)
         self.ram_bar.setValue(ram)
         self.clock_label.setText(datetime.now().strftime("%H:%M"))
@@ -1114,15 +1198,17 @@ class AtlasWindow(QMainWindow):
 
     def set_status(self, status: str) -> None:
         normalized = status.upper()
-        foreground, background, border = STATUS_PALETTE.get(
+        foreground, _background, _border = STATUS_PALETTE.get(
             normalized,
             STATUS_PALETTE["DEFAULT"],
         )
-        self.status_label.setText(f"●  {normalized}")
+        self.status_label.setText(f"↳ {normalized.lower()}")
         if hasattr(self, "atlas_orb"):
             self.atlas_orb.set_state(normalized)
         if hasattr(self, "orb_state_label"):
-            self.orb_state_label.setText(normalized)
+            self.orb_state_label.setText(normalized.lower())
+        if hasattr(self, "trace_labels"):
+            self._update_trace_state(normalized)
         if hasattr(self, "processing_bar"):
             active_states = {
                 "EXECUTANDO",
@@ -1139,18 +1225,19 @@ class AtlasWindow(QMainWindow):
         self.status_label.setStyleSheet(
             "QLabel#status {"
             f"color: {foreground};"
-            f"background: {background};"
-            f"border: 1px solid {border};"
-            "border-radius: 10px;"
-            "padding: 4px 9px;"
+            "background: transparent;"
+            "border: none;"
+            "border-left: none;"
+            "padding: 1px 0;"
+            "font-family: 'Cascadia Mono', Consolas;"
             "font-size: 9px;"
-            "font-weight: 700;"
+            "font-weight: 600;"
             "}"
         )
 
         if normalized == "NÃO ENTENDI":
             self.listening = False
-            self.activity_label.setText("Não consegui reconhecer sua fala")
+            self.activity_label.setText("não consegui reconhecer sua fala")
             self._update_controls()
             QTimer.singleShot(1800, lambda: self.set_status("ONLINE"))
 
@@ -1237,23 +1324,25 @@ class AtlasWindow(QMainWindow):
     ) -> None:
         safe_author = html.escape(author)
         safe_message = html.escape(str(message)).replace("\n", "<br>")
-        timestamp = datetime.now().strftime("%H:%M")
-        alignment = "right" if align_right else "left"
-        bubble_width = "68%" if align_right else "78%"
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        role = "you" if align_right else "atlas"
+        author_label = "você" if align_right else safe_author.lower()
+        rule = "#d7a94b" if align_right else "#56e0c1"
 
         self.chat.append(
-            f"<table align='{alignment}' width='{bubble_width}' "
-            "cellspacing='0' cellpadding='12' "
-            f"bgcolor='{background}'>"
-            "<tr><td>"
-            f"<span style='color:{accent}; font-size:10px; "
-            f"font-weight:700;'>{safe_author}</span>"
-            f"<span style='color:{accent}; font-size:9px;'>"
-            f" &nbsp; {timestamp}</span><br>"
-            f"<span style='color:{foreground}; font-size:13px; line-height:1.45;'>"
-            f"{safe_message}</span>"
+            "<table width='100%' cellspacing='0' cellpadding='0'>"
+            "<tr>"
+            f"<td width='3' bgcolor='{rule}'></td>"
+            "<td width='12'></td>"
+            "<td>"
+            f"<span style='color:#73817b; font-family:Consolas; "
+            f"font-size:9px;'>{timestamp} / {role}</span><br>"
+            f"<span style='color:{rule}; font-family:Bahnschrift; "
+            f"font-size:11px; font-weight:600;'>{author_label} /</span><br>"
+            f"<span style='color:{foreground}; font-size:13px; "
+            f"line-height:1.45;'>{safe_message}</span>"
             "</td></tr></table>"
-            "<div style='height:7px;'></div>"
+            "<div style='height:11px;'></div>"
         )
         scrollbar = self.chat.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
@@ -1341,4 +1430,4 @@ class AtlasWindow(QMainWindow):
     def _stylesheet() -> str:
         """Compatibilidade com chamadas antigas da camada gráfica."""
 
-        return application_stylesheet()
+        return application_stylesheet() + "\n" + AtlasWindow._authorial_stylesheet()
