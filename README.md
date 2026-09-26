@@ -3,7 +3,6 @@
 [![Atlas CI](https://github.com/ssamirchayen/atlas-assistente-inteligente/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ssamirchayen/atlas-assistente-inteligente/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/Plataforma-Windows-0078D4?logo=windows)
-![Tests](https://img.shields.io/badge/Testes-994-16A34A)
 ![Code style](https://img.shields.io/badge/Qualidade-Ruff-D7FF64?logo=ruff&logoColor=black)
 ![License](https://img.shields.io/badge/Licen%C3%A7a-Propriet%C3%A1ria-111827)
 
